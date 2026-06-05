@@ -102,8 +102,7 @@ def get_admin_keyboard():
     kb = [
         [KeyboardButton(text="📊 Hisobot"), KeyboardButton(text="📈 Statistika")],
         [KeyboardButton(text="📦 Qoldiqlar"), KeyboardButton(text="📅 Import Tahlili")],
-        [KeyboardButton(text="📥 Kelgan Tovar"), KeyboardButton(text="🔄 Majburiy Yangilash")], # <-- Yangi tugma qo'shildi
-        [KeyboardButton(text="⚙️ Sozlamalar")]
+        [KeyboardButton(text="📥 Kelgan Tovar")
     ]
     return ReplyKeyboardMarkup(
         keyboard=kb,
