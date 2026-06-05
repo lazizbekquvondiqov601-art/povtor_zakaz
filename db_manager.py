@@ -895,3 +895,35 @@ def generate_sklad_excel():
     except Exception as e:
         print(f"❌ Sklad uchun Excel yaratishda xato: {e}")
         return None
+# 🟢 BILAN BOSHLANADIGAN KOD (db_manager.py faylining eng oxiriga qo'shing):
+def add_admin_db(telegram_id: int) -> bool:
+    """Yangi adminni bazaga xavfsiz qo'shadi"""
+    session = Session()
+    try:
+        exists = session.query(Admin).filter_by(telegram_id=telegram_id).first()
+        if not exists:
+            session.add(Admin(telegram_id=telegram_id))
+            session.commit()
+            return True
+        return False
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
+
+def remove_admin_db(telegram_id: int) -> bool:
+    """Adminni bazadan xavfsiz o'chiradi"""
+    session = Session()
+    try:
+        admin = session.query(Admin).filter_by(telegram_id=telegram_id).first()
+        if admin:
+            session.delete(admin)
+            session.commit()
+            return True
+        return False
+    except Exception:
+        session.rollback()
+        return False
+    finally:
+        session.close()
