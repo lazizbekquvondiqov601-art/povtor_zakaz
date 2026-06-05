@@ -102,7 +102,8 @@ def get_admin_keyboard():
     kb = [
         [KeyboardButton(text="📊 Hisobot"), KeyboardButton(text="📈 Statistika")],
         [KeyboardButton(text="📦 Qoldiqlar"), KeyboardButton(text="📅 Import Tahlili")],
-        [KeyboardButton(text="📥 Kelgan Tovar")]
+        [KeyboardButton(text="📥 Kelgan Tovar"), KeyboardButton(text="🔄 Supplier Menyu")], # 🟢 Yangi tugma
+        
     ]
     return ReplyKeyboardMarkup(
         keyboard=kb,
@@ -465,6 +466,27 @@ async def show_statistics(message: types.Message, state: FSMContext):
     text += f"━━━━━━━━━━━━━━\n🚛 <b>JAMI: {int(total_packs)} POCHKA</b>"
     await message.answer(text)
 # --- SUPPLIER TUGMALARI UCHUN HANDLERLAR ---
+
+# YANGI KOD (bot.py faylining istalgan joyiga, handlerlar qatoriga qo'shing):
+
+@dp.message(F.text == "🔄 Supplier Menyu")
+async def switch_to_supplier_handler(message: Message):
+    user_id = message.from_user.id
+    
+    # Bazadan bu odam yetkazib beruvchimi yoki yo'qligini tekshiramiz
+    supplier = db_manager.get_supplier_by_id(user_id)
+    
+    if supplier:
+        await message.answer(
+            "📦 <b>Yetkazib beruvchi (Supplier) menyusiga o'tdingiz.</b>\n"
+            "Bu yerda o'z zakazlaringizni ko'rishingiz mumkin.",
+            reply_markup=get_supplier_keyboard() # Supplier klaviaturasi beriladi
+        )
+    else:
+        await message.answer(
+            "⚠️ Siz yetkazib beruvchi (supplier) sifatida ro'yxatdan o'tmagansiz!\n"
+            "Shu sababli bu menyuga o'ta olmaysiz."
+        )
 
 # --- ZAKAZ STATISTIKASI (eski logika) ---
 @dp.callback_query(F.data == "stat_zakaz")
