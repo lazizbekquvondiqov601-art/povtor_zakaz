@@ -135,13 +135,13 @@ async def get_orders_for_supplier(supplier_name: str) -> pd.DataFrame:
 
 # --- START va MENU Logikasi ---
 
+
 @dp.message(CommandStart())
 async def send_welcome(message: Message, state: FSMContext):
     await state.clear()
     user_id = message.from_user.id
 
     # --- 1. SUPER ADMIN MENYUSI ---
-# --- 1. SUPER ADMIN MENYUSI ---
     if user_id == config.SUPER_ADMIN_ID:
         is_locked = db_manager.is_global_locked()
         lock_text = "🟢 Tizimni OCHISH" if is_locked else "🔴 Tizimni YOPISH"
@@ -152,7 +152,7 @@ async def send_welcome(message: Message, state: FSMContext):
             [KeyboardButton(text="🔒 Bloklash"), KeyboardButton(text="🔓 Blokdan ochish")],
             [KeyboardButton(text="📊 Hisobot"), KeyboardButton(text="📈 Statistika")],
             [KeyboardButton(text="📦 Qoldiqlar"), KeyboardButton(text="📅 Import Tahlili")],
-            [KeyboardButton(text="📥 Kelgan Tovar"), KeyboardButton(text="🔄 Majburiy Yangilash")], # <-- MANA SHU YERGA TO'G'RI QO'SHILDI
+            [KeyboardButton(text="📥 Kelgan Tovar"), KeyboardButton(text="🔄 Majburiy Yangilash")],
             [KeyboardButton(text="⚙️ Sozlamalar")]
         ]
         
@@ -161,6 +161,41 @@ async def send_welcome(message: Message, state: FSMContext):
             reply_markup=ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
         )
         return
+
+    # --- 2. ODDIY ADMIN MENYUSI ---
+    if db_manager.is_admin(user_id):
+        await message.answer(
+            "👋 Assalomu alaykum, <b>Admin!</b>\n\nQuyidagi menyudan kerakli bo'limni tanlang:",
+            reply_markup=get_admin_keyboard()
+        )
+        return
+
+    # --- 3. SUPPLIER (YETKAZIB BERUVCHI) MENYUSI ---
+    supplier = db_manager.get_supplier_by_id(user_id)
+    if supplier:
+        await message.answer(
+            f"👋 Assalomu alaykum, <b>{supplier.name}</b>!\n\nYangi zakazlarni ko'rish uchun tugmani bosing:",
+            reply_markup=get_supplier_keyboard()
+        )
+        return
+
+    # --- 4. YANGI FOYDALANUVCHI (Ochiq ro'yxatdan o'tish rejimi) ---
+    # Taklif qilish cheklovi butunlay olib tashlandi, har qanday yangi kirgan foydalanuvchi ro'yxatdan o'tishi mumkin [text/plain]
+    categories = db_manager.get_unassigned_categories()
+    if not categories:
+        await message.answer("Hozircha bo'sh yetkazib beruvchi nomlari yo'q.")
+        return
+
+    kb_builder = []
+    for cat in categories:
+        kb_builder.append([InlineKeyboardButton(text=cat, callback_data=f"regCat_{cat}")])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=kb_builder)
+    await message.answer(
+        "👋 Assalomu alaykum! Tizimga kirish uchun avval faoliyat turingizni (Kategoriya) tanlang:",
+        reply_markup=keyboard
+    )
+    await state.set_state(Registration.filter_category)
     
 @dp.message(IsAdmin(), F.text == "⚙️ Sozlamalar")
 async def show_settings_text(message: types.Message, state: FSMContext):
