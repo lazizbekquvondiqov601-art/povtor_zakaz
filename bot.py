@@ -115,11 +115,9 @@ def get_supplier_keyboard():
     kb = [
         [KeyboardButton(text="📦 Zakazlarim (Yangi)"), KeyboardButton(text="⏳ Jarayonda")],
         [KeyboardButton(text="📈 Statistika"), KeyboardButton(text="📅 Import Tahlili")],
-        [KeyboardButton(text="📝 Ismni o'zgartirish")]
+        [KeyboardButton(text="📝 Ismni o'zgartirish"), KeyboardButton(text="🔑 Admin Bo'lish")] # 🟢 Yangi tugma
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-# --- Yordamchi Funksiyalar ---
-
 async def get_orders_for_supplier(supplier_name: str) -> pd.DataFrame:
     cleaned_name = supplier_name.replace('\u00A0', ' ').strip()
     def _read_db():
@@ -832,6 +830,28 @@ async def stat_back(callback: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 # --- SUPPLIER TUGMALARI UCHUN HANDLERLAR ---
+# YANGI KOD (bot.py faylining istalgan joyiga, handlerlar qatoriga qo'shing):
+
+@dp.message(F.text == "🔑 Admin Bo'lish")
+async def become_admin_handler(message: Message):
+    user_id = message.from_user.id
+    
+    # 1. Bazadagi "admins" jadvaliga qo'shish funksiyasini chaqiramiz (boya db_manager ga yozganimiz)
+    success = db_manager.add_admin_db(user_id)
+    
+    if success:
+        # Yangi admin tayinlandi
+        await message.answer(
+            "🎉 <b>Tabriklaymiz! Siz muvaffaqiyatli ADMIN qilib tayyinlandingiz.</b>\n\n"
+            "Endi siz hisobotlar, statistika, qoldiqlar va kelgan tovarlar tahlilini ko'ra olasiz.",
+            reply_markup=get_admin_keyboard() # Oddiy admin klaviaturasi beriladi
+        )
+    else:
+        # Foydalanuvchi allaqachon ro'yxatda bor bo'lsa ham admin menyusini ochadi
+        await message.answer(
+            "⚠️ Siz allaqachon adminlar ro'yxatida mavjudsiz. Menyuni tanlang:",
+            reply_markup=get_admin_keyboard()
+        )
 
 @dp.message(F.text == "📦 Zakazlarim (Yangi)")
 async def my_orders_text(message: types.Message):
