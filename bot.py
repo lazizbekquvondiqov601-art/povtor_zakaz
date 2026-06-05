@@ -669,8 +669,8 @@ async def process_calendar_selection(callback: CallbackQuery, state: FSMContext)
                 await callback.answer("❌ Tugash sanasi boshlang'ichdan oldin bo'lishi mumkin emas!", show_alert=True)
                 return
                 
-            if (end_dt - start_dt).days > 3:
-                await callback.answer("❌ Maksimal 3 kunlik ma'lumotni ko'rish mumkin!", show_alert=True)
+            if (end_dt - start_dt).days > 31:
+                await callback.answer("❌ Maksimal 31 kun (1 oy) oralig'ini tanlashingiz mumkin!", show_alert=True)
                 return
             
             # Telegram aylanuvchi soatni darhol o'chiramiz
@@ -691,26 +691,11 @@ async def process_calendar_selection(callback: CallbackQuery, state: FSMContext)
             def format_money(val):
                 return f"{int(val):,}".replace(",", " ")
 
+# YANGI (shu bilan almashtiring):
             if result == "dax":
-                summary = await asyncio.to_thread(
+                text_out = await asyncio.to_thread(
                     import_file.get_imported_summary_by_dax, db_manager.engine, start_str, end_str
                 )
-                
-                text_out = f"📥 <b>KELGAN TOVARLAR TAHLILI (DAX)</b>\n"
-                text_out += f"📅 Davr: <b>{start_str} — {end_str}</b>\n\n"
-                
-                grand_total = 0
-                for cat, dax_list in sorted(summary.items()):
-                    text_out += f"📦 <b>{cat}:</b>\n"
-                    cat_total = 0
-                    for dax_grp, qty in dax_list:
-                        text_out += f"  - {dax_grp}: <b>{int(qty)} dona</b>\n"
-                        cat_total += qty
-                    text_out += f"  👉 <b>Jami {cat}: {int(cat_total)} dona</b>\n\n"
-                    grand_total += cat_total
-                    
-                text_out += "━━━━━━━━━━━━━━\n"
-                text_out += f"🚛 <b>UMUMIY JAMI IMPORT: {int(grand_total)} dona</b>"
                 
                 kb = [[InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")]]
                 await callback.message.edit_text(text_out, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
