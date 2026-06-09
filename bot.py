@@ -3,6 +3,7 @@ import uuid # <-- Buni importlar qatoriga qo'shing
 import asyncio
 import pandas as pd
 import io
+import auto_zakaz
 import calendar
 import matplotlib
 matplotlib.use('Agg')  # Serverda orqa fonda xatosiz ishlashi uchun GUI'ni o'chirib qo'yamiz
@@ -36,6 +37,7 @@ import config
 import db_manager
 import data_engine
 # Buni esa importlardan keyin, bot=Bot(...) dan oldinroqqa qo'ying
+OBR_CACHE = {}
 STAT_CACHE = {}
 # --- Bot sozlamalari ---
 bot = Bot(token=config.TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
@@ -150,7 +152,8 @@ async def send_welcome(message: Message, state: FSMContext):
             [KeyboardButton(text="🔒 Bloklash"), KeyboardButton(text="🔓 Blokdan ochish")],
             [KeyboardButton(text="📊 Hisobot"), KeyboardButton(text="📈 Statistika")],
             [KeyboardButton(text="📦 Qoldiqlar"), KeyboardButton(text="📅 Import Tahlili")],
-            [KeyboardButton(text="📥 Kelgan Tovar"), KeyboardButton(text="🔄 Majburiy Yangilash")],
+            [KeyboardButton(text="📊 Asosiy Zakaz (OBR)"), KeyboardButton(text="📥 Kelgan Tovar")],
+            [KeyboardButton(text="🔄 Majburiy Yangilash")],
             [KeyboardButton(text="⚙️ Sozlamalar")]
         ]
         
@@ -232,6 +235,447 @@ async def kelgan_tovar_click(message: Message, state: FSMContext):
         "Kirim qilingan tovarlarni bilish uchun <b>boshlang'ich sanani</b> tanlang:",
         reply_markup=get_inline_calendar(now.year, now.month, "imp_start")
     )
+
+
+# --- AVTO ZAKAZ (OBR) MENYULARI VA KESHLASH ---
+
+@dp.message(IsAdmin(), F.text == "📊 Asosiy Zakaz (OBR)")
+async def auto_zakaz_click(message: Message):
+    msg = await message.answer("⏳ <b>Asosiy Zakaz (OBR) hisoblanmoqda...</b>\n\nBu jarayon 10-20 soniya olishi mumkin.")
+
+    # 1. Jadvalni hisoblash
+    df = await asyncio.to_thread(auto_zakaz.calculate_auto_zakaz, db_manager.engine)
+
+    if df.empty:
+        await msg.edit_text("✅ Hozirgi holat bo'yicha 'Zakaz' qilish kerak bo'lgan hech qanday tovar yo'q.")
+        return
+
+    # 2. Keyingi bosqichlar uchun ma'lumotni keshga saqlaymiz
+    session_id = str(uuid.uuid4())[:8]
+    OBR_CACHE[session_id] = df
+
+    # 3. Kategoriyalarni topib tugma qilamiz
+    cats = sorted(df['Категория'].unique().tolist())
+    kb = []
+    
+    for c in cats:
+        if not c: continue
+        cat_id = str(uuid.uuid4())[:8]
+        OBR_CACHE[f"cat_{cat_id}"] = c
+        kb.append([InlineKeyboardButton(text=f"📁 {c}", callback_data=f"obrCat_{session_id}_{cat_id}")])
+
+    kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
+
+    await msg.edit_text(
+        "📊 <b>ASOSIY ZAKAZ (OBR)</b>\n\nQaysi kategoriyani ko'rmoqchisiz?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import io
+
+def generate_macro_image(df, sub_name: str):
+    """
+    Makro tahlil jadvalini rasm (PNG) qilib qaytaradi.
+    Returns: BytesIO | None
+    """
+    sub_df_full = df[df['Подкатегория'] == sub_name]
+    if sub_df_full.empty:
+        return None
+
+    macro = sub_df_full.groupby('Real_Sotuv_Segmenti').agg(
+        Sred_Ost=('Ortacha_Qoldiq', 'sum'),
+        Hoz_Qoldiq=('Hozirgi_Qoldiq', 'sum'),
+        Sotuv=('Продано', 'sum'),
+        Auto_Zakaz=('Zakaz', 'sum')
+    ).reset_index().sort_values('Real_Sotuv_Segmenti')
+
+    total_sales  = macro['Sotuv'].sum()
+    total_qoldiq = macro['Hoz_Qoldiq'].sum()
+    total_sred   = macro['Sred_Ost'].sum()
+    total_zakaz  = macro['Auto_Zakaz'].sum()
+    total_obr    = (total_sales / total_sred * 100) if total_sred > 0 else 0
+
+    # --- MA'LUMOTLARNI TAYYORLASH ---
+    table_rows = []
+    for _, row in macro.iterrows():
+        seg_full = row['Real_Sotuv_Segmenti']
+        try:
+            # "1. Dvoyka Arzon (60k gacha)" -> "1. Arzon (60k gacha)"
+            num   = seg_full.split(".")[0].strip()
+            rest  = seg_full.split(".", 1)[1].strip()  # "Dvoyka Arzon (60k gacha)"
+            for word in sub_name.split():
+                rest = rest.replace(word, "").strip()
+            seg_short = f"{num}. {rest}"              # "1. Arzon (60k gacha)"
+        except:
+            seg_short = seg_full
+
+        sotuv  = int(row['Sotuv'])
+        qoldiq = int(row['Hoz_Qoldiq'])
+        sred   = row['Sred_Ost']
+        zakaz  = int(row['Auto_Zakaz'])
+        obr_val = (sotuv / sred * 100) if sred > 0 else 0
+        q_ul   = round(qoldiq / total_qoldiq * 100) if total_qoldiq > 0 else 0
+        s_ul   = round(sotuv  / total_sales  * 100) if total_sales  > 0 else 0
+
+        table_rows.append([
+            seg_short,
+            f"{int(obr_val)}%",
+            f"{sotuv}",
+            f"{qoldiq}",
+            f"{q_ul}%",
+            f"{s_ul}%",
+            f"{zakaz}" if zakaz > 0 else "—"
+        ])
+        
+    # JAMI qatori
+    table_rows.append([
+        "JAMI",
+        f"{int(total_obr)}%",
+        f"{int(total_sales)}",
+        f"{int(total_qoldiq)}",
+        "100%",
+        "100%",
+        f"{int(total_zakaz)}"
+    ])
+
+    col_labels = ["Segment", "OBR%", "Sotildi", "Qoldiq", "Q.Ulush", "S.Ulush", "Zakaz"]
+
+    # --- RASM CHIZISH ---
+    n_rows = len(table_rows)
+    fig_h  = 0.45 * (n_rows + 1) + 0.8
+    fig, ax = plt.subplots(figsize=(7, fig_h))
+    ax.axis('off')
+
+    # Sarlavha
+    fig.text(0.04, 0.97, f"📊  MAKRO TAHLIL: {sub_name}",
+             fontsize=13, fontweight='bold', va='top', color='#1a1a1a')
+    fig.text(0.04, 0.90, "Davr: oy boshidan",
+             fontsize=9, va='top', color='#888888')
+
+    table = ax.table(
+        cellText=table_rows,
+        colLabels=col_labels,
+        cellLoc='center',
+        loc='center'
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.55)
+
+    # --- RANG BERISH ---
+    col_widths = [0.26, 0.10, 0.10, 0.10, 0.10, 0.10, 0.10]
+    for j, w in enumerate(col_widths):
+        table.auto_set_column_width(j)
+
+    for (r, c), cell in table.get_celld().items():
+        cell.set_edgecolor('#dddddd')
+        cell.set_linewidth(0.5)
+
+        if r == 0:
+            # Sarlavha qatori
+            cell.set_facecolor('#2C3E50')
+            cell.set_text_props(color='white', fontweight='bold', fontsize=9)
+        elif r == n_rows:
+            # JAMI qatori
+            cell.set_facecolor('#ECF0F1')
+            cell.set_text_props(fontweight='bold')
+        else:
+            # OBR ranglar (c==1 ustun)
+            if c == 1:
+                try:
+                    obr_val = int(table_rows[r-1][1].replace('%',''))
+                    if obr_val >= 100:
+                        cell.set_facecolor('#d4edda')  # yashil
+                        cell.set_text_props(color='#155724', fontweight='bold')
+                    elif obr_val >= 50:
+                        cell.set_facecolor('#fff3cd')  # sariq
+                        cell.set_text_props(color='#856404', fontweight='bold')
+                    else:
+                        cell.set_facecolor('#f8d7da')  # qizil
+                        cell.set_text_props(color='#721c24', fontweight='bold')
+                except:
+                    pass
+            # Zakaz rangi (c==6)
+            elif c == 6:
+                try:
+                    z = int(table_rows[r-1][6])
+                    if z > 0:
+                        cell.set_facecolor('#cce5ff')
+                        cell.set_text_props(color='#004085', fontweight='bold')
+                except:
+                    pass
+            # Q.Ulush vs S.Ulush taqqoslash (c==4 va c==5)
+            elif c in (4, 5):
+                try:
+                    q = int(table_rows[r-1][4].replace('%',''))
+                    s = int(table_rows[r-1][5].replace('%',''))
+                    if c == 5 and s > q + 5:
+                        cell.set_facecolor('#fff3cd')
+                        cell.set_text_props(color='#856404', fontweight='bold')
+                    elif c == 4 and q > s + 10:
+                        cell.set_facecolor('#d1ecf1')
+                        cell.set_text_props(color='#0c5460')
+                except:
+                    pass
+            else:
+                cell.set_facecolor('#ffffff' if r % 2 == 1 else '#f9f9f9')
+
+    plt.tight_layout(rect=[0, 0, 1, 0.88])
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
+    buf.seek(0)
+    plt.close(fig)
+    return buf
+
+
+@dp.callback_query(F.data.startswith("obrCat_"))
+async def obr_cat_click(callback: CallbackQuery):
+    _, session_id, cat_id = callback.data.split("_")
+    df = OBR_CACHE.get(session_id)
+    cat_name = OBR_CACHE.get(f"cat_{cat_id}")
+
+    if df is None or cat_name is None:
+        await callback.answer("⏳ Ma'lumot eskirgan. Iltimos qaytadan hisoblang.", show_alert=True)
+        return
+
+    cat_df = df[df['Категория'] == cat_name]
+    subs = sorted(cat_df['Подкатегория'].unique().tolist())
+
+    kb = []
+    for sub in subs:
+        if not sub: continue
+        sub_id = str(uuid.uuid4())[:8]
+        OBR_CACHE[f"sub_{sub_id}"] = sub
+        kb.append([InlineKeyboardButton(text=f"📂 {sub}", callback_data=f"obrSub_{session_id}_{cat_id}_{sub_id}")])
+
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"obrBackRoot_{session_id}")])
+
+    text = f"📁 <b>{cat_name}</b>\nPodkategoriyani tanlang:"
+    markup = InlineKeyboardMarkup(inline_keyboard=kb)
+
+    # ✅ Rasm yoki matn xabarga qarab to'g'ri method chaqiramiz
+    try:
+        if callback.message.photo:
+            await callback.message.delete()
+            await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
+        else:
+            await callback.message.edit_text(text, reply_markup=markup)
+    except Exception:
+        await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
+
+
+@dp.callback_query(F.data.startswith("obrSegDet_"))
+async def obr_seg_detail_click(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    _, session_id, cat_id, sub_id, seg_id = parts
+    df       = OBR_CACHE.get(session_id)
+    cat_name = OBR_CACHE.get(f"cat_{cat_id}")
+    sub_name = OBR_CACHE.get(f"sub_{sub_id}")
+    seg_name = OBR_CACHE.get(f"seg_{seg_id}")
+
+    if df is None or not sub_name or not seg_name:
+        await callback.answer("⏳ Ma'lumot eskirgan.", show_alert=True)
+        return
+
+    seg_df = df[
+        (df['Подкатегория'] == sub_name) &
+        (df['Real_Sotuv_Segmenti'] == seg_name)
+    ].copy()
+
+    seg_df = seg_df[~((seg_df['Hozirgi_Qoldiq'] >= 5) & (seg_df['Продано'] < 5))]
+
+    if seg_df.empty:
+        await callback.answer("⚠️ Bu segmentda zakaz ehtiyoji yo'q.", show_alert=True)
+        return
+
+    # --- Razmer sort ---
+    def razmer_sort_key(r):
+        r = str(r).strip()
+        if '-' in r:
+            try: return int(r.split('-')[0])
+            except: pass
+        try: return int(r)
+        except: return 9999
+
+    seg_df['_razmer_sort'] = seg_df['Размер сетка'].apply(razmer_sort_key)
+
+    # --- Jins ustunini olish (Пол dan) ---
+    # auto_zakaz.py da Пол ustuni d_mahsulotlar dan olinadi
+    # calculate_auto_zakaz da GROUP_KEYS ga Пол qo'shish kerak bo'ladi
+    # Hozircha df da Пол bo'lsa ishlatamiz, bo'lmasa Вид2 ga tushamiz
+    if 'Пол' in seg_df.columns:
+        seg_df['_jins'] = seg_df['Пол'].fillna('').astype(str).str.strip()
+    elif 'Вид2' in seg_df.columns:
+        seg_df['_jins'] = seg_df['Вид2'].fillna('').astype(str).str.strip()
+    else:
+        seg_df['_jins'] = 'Универсал'
+
+    # Bo'sh qiymatlarni Универсал ga almashtirish
+    seg_df['_jins'] = seg_df['_jins'].replace('', 'Универсал')
+
+    # --- Normalizatsiya ---
+    JINS_NORMALIZE = {
+        'Девочек': 'Девочки',
+        'Мальчик': 'Мальчики',
+    }
+    seg_df['_jins'] = seg_df['_jins'].apply(lambda x: JINS_NORMALIZE.get(x, x))
+
+    JINS_ORDER = ['Девочки', 'Мальчики', 'Универсал']
+    JINS_ICONS = {
+        'Девочки': '👧',
+        'Мальчики': '👦',
+        'Универсал': '🌐'
+    }
+
+    def jins_sort_key(v):
+        try: return JINS_ORDER.index(str(v).strip())
+        except: return len(JINS_ORDER)
+
+    seg_df['_jins_sort'] = seg_df['_jins'].apply(jins_sort_key)
+    seg_df = seg_df.sort_values(['_jins_sort', '_razmer_sort']).reset_index(drop=True)
+
+    await callback.message.delete()
+
+    jinslar_sorted = sorted(seg_df['_jins'].unique(), key=jins_sort_key)
+
+    text_blocks = []
+    header = f"📦 <b>{sub_name}</b>\n<i>{seg_name}</i>\n\n"
+    current_text = header
+
+    for jins in jinslar_sorted:
+        jins_df = seg_df[seg_df['_jins'] == jins]
+        icon = JINS_ICONS.get(jins, '👤')
+
+        jins_header = f"{icon} <b>{jins if jins else 'Универсал'}:</b>\n"
+
+        if len(current_text) + len(jins_header) > 4000:
+            text_blocks.append(current_text)
+            current_text = header + jins_header
+        else:
+            current_text += jins_header
+
+        for _, row in jins_df.iterrows():
+            razmer = str(row.get('Размер сетка', '')).strip() or "Noma'lum"
+            mat    = str(row.get('Материал2', '')).strip() or "—"
+            zakaz  = row.get('Zakaz', 0)
+            qoldiq = row.get('Hozirgi_Qoldiq', 0)
+            sotuv  = row.get('Продано', 0)
+            obr    = row.get('OBR %', '0%')
+
+            item_text = (
+                f"  <b>{razmer}</b>\n"
+                f"  <b>{razmer}</b> | {mat}\n"
+                f"  Sotuv: <b>{sotuv}</b> | Qoldiq: <b>{qoldiq}</b> | OBR: <b>{obr}</b>\n"
+                f"  🛒 <b>ZAKAZ: {zakaz} ta</b>\n"
+                "  ──────────\n"
+            )
+
+            if len(current_text) + len(item_text) > 4000:
+                text_blocks.append(current_text)
+                current_text = item_text
+            else:
+                current_text += item_text
+
+        current_text += "\n"
+
+    if current_text.strip():
+        text_blocks.append(current_text)
+
+    kb = [[InlineKeyboardButton(
+        text="⬅️ Orqaga (Segmentlarga)",
+        callback_data=f"obrSub_{session_id}_{cat_id}_{sub_id}"
+    )]]
+
+    for i, t_block in enumerate(text_blocks):
+        if i == len(text_blocks) - 1:
+            await bot.send_message(callback.message.chat.id, t_block,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        else:
+            await bot.send_message(callback.message.chat.id, t_block)
+
+@dp.callback_query(F.data.startswith("obrSub_"))
+async def obr_sub_click(callback: CallbackQuery):
+    _, session_id, cat_id, sub_id = callback.data.split("_")
+    df       = OBR_CACHE.get(session_id)
+    cat_name = OBR_CACHE.get(f"cat_{cat_id}")
+    sub_name = OBR_CACHE.get(f"sub_{sub_id}")
+
+    if df is None or not cat_name or not sub_name:
+        await callback.answer("⏳ Ma'lumot eskirgan.", show_alert=True)
+        return
+
+    await callback.message.delete()
+
+    # Rasm generatsiya
+    img_buf = await asyncio.to_thread(generate_macro_image, df, sub_name)
+
+    # Segmentlarni topamiz
+    sub_df = df[df['Подкатегория'] == sub_name]
+    segments = sorted(sub_df['Real_Sotuv_Segmenti'].unique().tolist())
+
+    # Segment tugmalari
+    kb = []
+    for seg in segments:
+        if not seg: continue
+        seg_id = str(uuid.uuid4())[:8]
+        OBR_CACHE[f"seg_{seg_id}"] = seg
+        # Segment nomini qisqartirish: "1. Arzon (40k gacha)" -> "1. Arzon (40k gacha)"
+        kb.append([InlineKeyboardButton(
+            text=f"🔹 {seg.split('(')[0].strip()}",
+            callback_data=f"obrSegDet_{session_id}_{cat_id}_{sub_id}_{seg_id}"
+        )])
+
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"obrCat_{session_id}_{cat_id}")])
+
+    if img_buf:
+        photo = BufferedInputFile(img_buf.getvalue(), filename="macro.png")
+        await bot.send_photo(
+            callback.message.chat.id,
+            photo=photo,
+            caption=f"📊 <b>{sub_name}</b> — segment tanlang:",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        )
+    else:
+        await bot.send_message(
+            callback.message.chat.id,
+            f"⚠️ {sub_name} bo'yicha ma'lumot topilmadi.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        )
+
+@dp.callback_query(F.data.startswith("obrBackRoot_"))
+async def obr_back_root(callback: CallbackQuery):
+    session_id = callback.data.split("_")[1]
+    df = OBR_CACHE.get(session_id)
+    if df is None:
+        await callback.answer("⏳ Ma'lumot eskirgan. Qaytadan hisoblang.", show_alert=True)
+        return
+
+    cats = sorted(df['Категория'].unique().tolist())
+    kb = []
+    for c in cats:
+        if not c: continue
+        cat_id = str(uuid.uuid4())[:8]
+        OBR_CACHE[f"cat_{cat_id}"] = c
+        kb.append([InlineKeyboardButton(text=f"📁 {c}", callback_data=f"obrCat_{session_id}_{cat_id}")])
+
+    kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
+
+    text = "📊 <b>ASOSIY ZAKAZ (OBR)</b>\n\nQaysi kategoriyani ko'rmoqchisiz?"
+    markup = InlineKeyboardMarkup(inline_keyboard=kb)
+
+    # ✅ Rasm yoki matn xabarga qarab
+    try:
+        if callback.message.photo:
+            await callback.message.delete()
+            await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
+        else:
+            await callback.message.edit_text(text, reply_markup=markup)
+    except Exception:
+        await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
 
 @dp.message(IsAdmin(), F.text == "🔄 Majburiy Yangilash")
 async def force_update_text(message: types.Message):
@@ -2259,6 +2703,54 @@ async def download_stock_excel_handler(callback: CallbackQuery):
     await msg.delete()
     await callback.answer()
 # --- MAIN LOOP (BOTNI ISHGA TUSHIRISH MOTOR) ---
+
+
+@dp.message(Command("reset_db"))
+async def reset_db_handler(message: Message):
+    # Faqat Super Admin o'chira oladi
+    if message.from_user.id != config.SUPER_ADMIN_ID:
+        await message.answer("⚠️ Bu maxsus buyruq faqat Bosh Admin (Super Admin) uchun!")
+        return
+
+    # Tasdiqlash tugmalari
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💥 Ha, bazani tozalash", callback_data="confirm_db_reset")],
+        [InlineKeyboardButton(text="❌ Yo'q, bekor qilish", callback_data="del_msg")]
+    ])
+    
+    await message.answer(
+        "⚠️ <b>DIQQAT! BAZANI NOLDAN TOZALASH</b>\n\n"
+        "Ushbu buyruq Sotuvlar (<code>f_sotuvlar</code>), Qoldiqlar (<code>f_qoldiqlar</code>) va "
+        "Katalog (<code>d_mahsulotlar</code>) jadvallarini butunlay tozalab yuboradi.\n\n"
+        "Haqiqatan ham hamma narsani o'chirib, noldan boshlamoqchimisiz?",
+        reply_markup=kb
+    )
+@dp.callback_query(F.data == "confirm_db_reset")
+async def confirm_db_reset_handler(callback: CallbackQuery):
+    if callback.from_user.id != config.SUPER_ADMIN_ID:
+        await callback.answer("⚠️ Ruxsat berilmagan!", show_alert=True)
+        return
+
+    try:
+        from sqlalchemy import text
+        # Jadvallarni o'chirish
+        with db_manager.engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS f_sotuvlar;"))
+            conn.execute(text("DROP TABLE IF EXISTS f_qoldiqlar;"))
+            conn.execute(text("DROP TABLE IF EXISTS d_mahsulotlar;"))
+        
+        # Jadvallarni bo'sh holda qayta yaratish
+        db_manager.init_db()
+        
+        await callback.message.edit_text(
+            "✅ <b>Baza muvaffaqiyatli tozalandi!</b>\n\n"
+            "Endi menyudan <b>'🔄 Majburiy Yangilash'</b> tugmasini bossangiz, bot barcha "
+            "sotuvlar va qoldiqlarni Billzdan mutlaqo toza va duplikatsiz qaytadan yuklab oladi."
+        )
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Tozalashda xatolik yuz berdi:\n<code>{e}</code>")
+
+
 async def main():
     db_manager.init_db()
     await bot.delete_webhook(drop_pending_updates=True)

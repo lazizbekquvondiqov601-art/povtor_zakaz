@@ -57,13 +57,14 @@ def process_and_clean_sales_chunk(chunk_of_records):
         df['Акция'] = df['custom_fields'].apply(lambda x: extract_custom_field(x, 'Акция'))
         df['Подкатегория'] = df['custom_fields'].apply(lambda x: extract_custom_field(x, 'Подкатегория'))
         df['Модель'] = df['custom_fields'].apply(lambda x: extract_custom_field(x, 'Модель'))
+        df['Размер сетка'] = df['custom_fields'].apply(lambda x: extract_custom_field(x, 'Размер сетка'))
         df = df.drop(columns=['custom_fields'])
 
     required_columns = [
         "product_id", 'Бренд', 'Материал', 'Вид', 'Категория', 'Наименование', 'Магазин', 'Дата', 'Дата2',
         'Артикул', 'Баркод', 'Подкатегория', 'Акция', 'Модель', 'Кол-во проданных', 'Кол-во возвращенных',
         'Продано за вычетом возвратов', 'Крой', 'Продажи без учета скидки', 'Сумма возвратов',
-        'Продажи со скидкой с учетом возвратов', 'Продажи по цене закупки', 'Валовая прибыль', 'Скидка', 'Цена продажи'
+        'Продажи со скидкой с учетом возвратов', 'Продажи по цене закупки', 'Валовая прибыль', 'Скидка', 'Цена продажи','Размер сетка'
     ]
 
     existing_columns = [col for col in required_columns if col in df.columns]
@@ -99,6 +100,7 @@ def process_and_clean_stock_chunk(chunk_of_records, report_date_str):
         df['Материал'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Материал'))
         df['Вид'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Вид'))
         df['Пол'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Пол'))
+        df['Размер сетка'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Размер сетка'))
         df = df.drop(columns=['product_custom_fields'])
 
     column_mapping = {
@@ -115,7 +117,7 @@ def process_and_clean_stock_chunk(chunk_of_records, report_date_str):
 
     required_columns = [
         'product_id', 'Бренд', 'Категория', 'Материал', 'Вид', "Наименование", 'Дата', 'Артикул', 'Подкатегория',
-        'Баркод', 'Магазин', 'Кол-во', 'Цена поставки', 'Цена продажи', 'Сумма прибыли остатков', 'Пол' # <-- Krilcha 'Кол-во' to'g'rilandi
+        'Баркод', 'Магазин', 'Кол-во', 'Цена поставки', 'Цена продажи', 'Сумма прибыли остатков', 'Пол','Размер сетка' # <-- Krilcha 'Кол-во' to'g'rilandi
     ]
     existing_columns = [col for col in required_columns if col in df.columns]
     df_clean = df[existing_columns].copy()
@@ -271,7 +273,7 @@ def update_catalog(access_token, engine):
 def update_sales(access_token, engine):
     print("\n--- 2-QADAM: SOTUVLARNI YANGILASH (KUNMA-KUN) ---")
     end_date = datetime.now(TASHKENT_TZ).replace(tzinfo=None)
-    start_date = end_date - timedelta(days=23)
+    start_date = end_date - timedelta(days=30)
 
     try:
         with engine.connect() as conn:
@@ -285,7 +287,7 @@ def update_sales(access_token, engine):
                     # Oxirgi 2 kunni qayta yuklaymiz (kecha + bugun)
                     start_date = last_date_in_db - timedelta(days=1)
     except Exception as e:
-        print(f"⚠️ Sanani aniqlashda xatolik: {e}. Standart 23 kun olinadi.")
+        print(f"⚠️ Sanani aniqlashda xatolik: {e}. Standart 30 kun olinadi.")
 
     current_process_date = start_date
 
@@ -347,7 +349,7 @@ def update_sales(access_token, engine):
 
         current_process_date += timedelta(days=1)
 
-    cutoff_date = (end_date - timedelta(days=24)).strftime("%Y-%m-%d")
+    cutoff_date = (end_date - timedelta(days=31)).strftime("%Y-%m-%d")
     try:
         with engine.begin() as conn:
             conn.execute(text(f'DELETE FROM f_sotuvlar WHERE "Дата" < \'{cutoff_date}\''))
@@ -358,7 +360,7 @@ def update_sales(access_token, engine):
 def update_stock(access_token, engine):
     print("\n--- 3-QADAM: QOLDIQLARNI YANGILASH (KUNMA-KUN) ---")
     end_date = datetime.now(TASHKENT_TZ).replace(tzinfo=None)
-    start_date = end_date - timedelta(days=23)
+    start_date = end_date - timedelta(days=30)
     
     try:
         with engine.connect() as conn:
@@ -427,7 +429,7 @@ def update_stock(access_token, engine):
 
         current_process_date += timedelta(days=1)
 
-    cutoff_date = (end_date - timedelta(days=24)).strftime("%Y-%m-%d")
+    cutoff_date = (end_date - timedelta(days=31)).strftime("%Y-%m-%d")
     try:
         with engine.begin() as conn:
             conn.execute(text(f'DELETE FROM f_qoldiqlar WHERE "Дата" < \'{cutoff_date}\''))
@@ -799,6 +801,15 @@ def run_full_update():
 
     try:
         engine = db_manager.engine
+        
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE f_sotuvlar ADD COLUMN "Размер сетка" TEXT'))
+        except Exception: pass
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE f_qoldiqlar ADD COLUMN "Размер сетка" TEXT'))
+        except Exception: pass
 
         update_catalog(access_token, engine)
         update_sales(access_token, engine)
