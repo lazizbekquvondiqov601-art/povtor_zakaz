@@ -708,8 +708,8 @@ def get_stock_subcategories_summary_v2(category: str, target_date: str) -> tuple
             SELECT "Подкатегория", "Пол", SUM("Кол-во") as total_qty
             FROM f_qoldiqlar
             WHERE "Категория" = :category
-              AND date("Дата") = :target_date
-              AND "Артикул" LIKE '010%'
+            AND date("Дата") = :target_date
+            AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
             GROUP BY "Подкатегория", "Пол"
             ORDER BY total_qty DESC
         ''')
@@ -750,7 +750,8 @@ def get_all_stock_summary_for_excel(target_date: str) -> tuple[pd.DataFrame, pd.
                 COALESCE("Пол", 'Универсал') as "Пол",
                 SUM("Кол-во") as "Қолдиқ (дона)"
             FROM f_qoldiqlar
-            WHERE date("Дата") = :target_date AND "Артикул" LIKE '010%'
+            WHERE date("Дата") = :target_date 
+            AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
             GROUP BY "Подкатегория", "Категория", "Пол"
             ORDER BY "Подкатегория" ASC, "Категория" ASC, "Пол" ASC
         ''')
@@ -772,7 +773,6 @@ def get_sales_by_period(start_date: str, end_date: str) -> tuple:
         try:
             params = {"start_date": start_date, "end_date": end_date}
 
-            # Asosiy tovarlar uchun (Soni va Foydasi)
             query_asosiy = text('''
                 SELECT 
                     COALESCE(NULLIF(TRIM("Категория"), ''), 'Boshqa tovarlar') as kat,
@@ -783,11 +783,11 @@ def get_sales_by_period(start_date: str, end_date: str) -> tuple:
                   AND date("Дата") <= :end_date
                   AND "Артикул" NOT LIKE '010%'
                   AND "Артикул" NOT LIKE '011%'
+                  AND "Наименование" NOT LIKE 'Пакет%'
                 GROUP BY kat
                 ORDER BY kat
             ''')
 
-            # Aksiya tovarlar uchun (Soni va Foydasi)
             query_aksiya = text('''
                 SELECT 
                     COALESCE(NULLIF(TRIM("Категория"), ''), 'Boshqa tovarlar') as kat,
@@ -797,16 +797,18 @@ def get_sales_by_period(start_date: str, end_date: str) -> tuple:
                 WHERE date("Дата") >= :start_date
                   AND date("Дата") <= :end_date
                   AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
+                  AND "Наименование" NOT LIKE 'Пакет%'
                 GROUP BY kat
                 ORDER BY kat
             ''')
 
             asosiy_rows = session.execute(query_asosiy, params).fetchall()
-            aksiya_rows = session.execute(query_aksiya, params).fetchall()
+            aksiya_rows  = session.execute(query_aksiya, params).fetchall()
 
-            # Endi ma'lumotlarni dict ko'rinishida yig'amiz: {'Kategoriya': {'qty': 10, 'profit': 50000}}
-            asosiy = {kat: {"qty": float(qty or 0), "profit": float(prof or 0)} for kat, qty, prof in asosiy_rows}
-            aksiya = {kat: {"qty": float(qty or 0), "profit": float(prof or 0)} for kat, qty, prof in aksiya_rows}
+            asosiy = {kat: {"qty": float(qty or 0), "profit": float(prof or 0)} 
+                      for kat, qty, prof in asosiy_rows}
+            aksiya  = {kat: {"qty": float(qty or 0), "profit": float(prof or 0)} 
+                      for kat, qty, prof in aksiya_rows}
 
             return asosiy, aksiya
         finally:
@@ -814,9 +816,53 @@ def get_sales_by_period(start_date: str, end_date: str) -> tuple:
     except Exception as e:
         print(f"❌ Sotuv tahlilida xatolik: {e}")
         return {}, {}
-    
 
+def get_stock_by_category() -> tuple[dict, dict]:
+    try:
+        session = Session()
+        try:
+            query_asosiy = text('''
+                SELECT 
+                    COALESCE(NULLIF(TRIM("Категория"), ''), 'skip') as kat,
+                    SUM("Кол-во") as total_qty
+                FROM f_qoldiqlar
+                WHERE date("Дата") = (SELECT MAX(date("Дата")) FROM f_qoldiqlar)
+                AND "Артикул" NOT LIKE '010%'
+                AND "Артикул" NOT LIKE '011%'
+                AND "Категория" IS NOT NULL
+                AND TRIM("Категория") != ''
+                GROUP BY kat
+                HAVING SUM("Кол-во") > 0
+                AND kat != 'skip'
+                ORDER BY kat
+            ''')
 
+            query_aksiya = text('''
+                SELECT 
+                    COALESCE(NULLIF(TRIM("Категория"), ''), 'Boshqa tovarlar') as kat,
+                    SUM("Кол-во") as total_qty
+                FROM f_qoldiqlar
+                WHERE date("Дата") = (SELECT MAX(date("Дата")) FROM f_qoldiqlar)
+                  AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
+                  AND "Категория" IS NOT NULL
+                  AND TRIM("Категория") != ''
+                GROUP BY kat
+                HAVING SUM("Кол-во") > 0
+                ORDER BY kat
+            ''')
+
+            asosiy_rows = session.execute(query_asosiy).fetchall()
+            aksiya_rows  = session.execute(query_aksiya).fetchall()
+
+            asosiy_qoldiq = {kat: float(q or 0) for kat, q in asosiy_rows}
+            aksiya_qoldiq = {kat: float(q or 0) for kat, q in aksiya_rows}
+
+            return asosiy_qoldiq, aksiya_qoldiq
+        finally:
+            session.close()
+    except Exception as e:
+        print(f"❌ Qoldiq olishda xatolik: {e}")
+        return {}, {}
 
 def generate_sklad_excel():
     """Jarayonda bo'lgan tovarlarni Skladchi uchun Excel shaklida tayyorlaydi (4 ta parametr: Kategoriya + Artikul + Rang + Narx bo'yicha moslashtiradi)"""

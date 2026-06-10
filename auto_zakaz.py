@@ -1,4 +1,5 @@
 import math
+import numpy as np
 import pandas as pd
 from datetime import datetime
 
@@ -157,6 +158,7 @@ def classify_imported_product(subcategory: str, retail_price: float) -> str:
 
     return "Boshqa tovarlar"
 
+
 def calculate_auto_zakaz(engine) -> pd.DataFrame:
     try:
         d_mahsulotlar = pd.read_sql(
@@ -165,133 +167,130 @@ def calculate_auto_zakaz(engine) -> pd.DataFrame:
             FROM d_mahsulotlar''',
             engine
         )
-        f_sotuvlar = pd.read_sql('''SELECT "product_id", "Магазин", "Продано за вычетом возвратов", "Дата" FROM f_sotuvlar''', engine)
-        f_qoldiqlar = pd.read_sql('''SELECT "product_id", "Магазин", "Кол-во", "Дата" FROM f_qoldiqlar''', engine)
+        f_sotuvlar  = pd.read_sql('SELECT "product_id", "Магазин", "Продано за вычетом возвратов", "Дата" FROM f_sotuvlar', engine)
+        f_qoldiqlar = pd.read_sql('SELECT "product_id", "Магазин", "Кол-во", "Дата" FROM f_qoldiqlar', engine)
 
         for df in [d_mahsulotlar, f_sotuvlar, f_qoldiqlar]:
             df['product_id'] = df['product_id'].astype(str).str.strip().str.lower()
-            
+
         d_mahsulotlar['Артикул'] = d_mahsulotlar['Артикул'].astype(str).str.strip()
         d_mahsulotlar = d_mahsulotlar[~d_mahsulotlar['Артикул'].str.startswith(('010', '011'))]
 
-        f_sotuvlar['Дата'] = pd.to_datetime(f_sotuvlar['Дата'], errors='coerce')
+        f_sotuvlar['Дата']  = pd.to_datetime(f_sotuvlar['Дата'],  errors='coerce')
         f_qoldiqlar['Дата'] = pd.to_datetime(f_qoldiqlar['Дата'], errors='coerce')
 
         oy_boshi = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        f_sotuvlar = f_sotuvlar[f_sotuvlar['Дата'] >= oy_boshi]
+        f_sotuvlar  = f_sotuvlar[f_sotuvlar['Дата']   >= oy_boshi]
         f_qoldiqlar = f_qoldiqlar[f_qoldiqlar['Дата'] >= oy_boshi]
 
         d_mahsulotlar['Цена продажи'] = pd.to_numeric(d_mahsulotlar['Цена продажи'], errors='coerce').fillna(0)
         d_mahsulotlar['Real_Sotuv_Segmenti'] = d_mahsulotlar.apply(
             lambda row: classify_imported_product(row['Подкатегория'], row['Цена продажи']), axis=1
         )
-        
         d_mahsulotlar = d_mahsulotlar[d_mahsulotlar['Real_Sotuv_Segmenti'] != "Boshqa tovarlar"]
-        
+
         d_mahsulotlar['Материал2'] = d_mahsulotlar['Материал'].apply(
             lambda m: str(m).strip().lower().replace('/', '-') if pd.notna(m) else ''
         )
         d_mahsulotlar['Вид2'] = d_mahsulotlar['Вид'].apply(
-            lambda v: 'полоска' if str(v).strip().lower() in ['в полоску', 'полоска'] else (str(v).strip().lower() if pd.notna(v) else '')
+            lambda v: 'полоска' if str(v).strip().lower() in ['в полоску', 'полоска']
+            else (str(v).strip().lower() if pd.notna(v) else '')
         )
 
-        GROUP_KEYS = ['Категория', 'Подкатегория', 'Наименование', 'Real_Sotuv_Segmenti', 'Размер сетка', 'Материал2', 'Вид2', 'Пол']
-        
+        GROUP_KEYS = ['Категория', 'Подкатегория', 'Наименование', 'Real_Sotuv_Segmenti',
+                      'Размер сетка', 'Материал2', 'Вид2', 'Пол']
+
         for col in GROUP_KEYS:
             d_mahsulotlar[col] = d_mahsulotlar[col].fillna('').astype(str).str.strip()
 
         prod_lookup = d_mahsulotlar[['product_id'] + GROUP_KEYS].drop_duplicates('product_id')
 
-        sotuv = pd.merge(f_sotuvlar, prod_lookup, on='product_id', how='inner')
+        sotuv     = pd.merge(f_sotuvlar,  prod_lookup, on='product_id', how='inner')
         sotuv_agg = sotuv.groupby(GROUP_KEYS).agg(
             Продано=('Продано за вычетом возвратов', 'sum'),
             Sotuv_kunlari=('Дата', 'nunique')
         ).reset_index()
 
         max_date_per_shop = f_qoldiqlar.groupby('Магазин')['Дата'].transform('max')
-        hoz_q = f_qoldiqlar[f_qoldiqlar['Дата'] == max_date_per_shop]
-        
-        hoz_q = pd.merge(hoz_q, prod_lookup, on='product_id', how='inner')
+        hoz_q     = f_qoldiqlar[f_qoldiqlar['Дата'] == max_date_per_shop]
+        hoz_q     = pd.merge(hoz_q, prod_lookup, on='product_id', how='inner')
         hoz_q_agg = hoz_q.groupby(GROUP_KEYS).agg(
             Hozirgi_Qoldiq=('Кол-во', 'sum')
         ).reset_index()
 
         oylik_qoldiqlar = f_qoldiqlar[f_qoldiqlar['Дата'] >= oy_boshi]
-        all_q = pd.merge(oylik_qoldiqlar, prod_lookup, on='product_id', how='inner')
-        daily_q = all_q.groupby(GROUP_KEYS + ['Дата']).agg(daily_sum=('Кол-во', 'sum')).reset_index()
+        all_q    = pd.merge(oylik_qoldiqlar, prod_lookup, on='product_id', how='inner')
+        daily_q  = all_q.groupby(GROUP_KEYS + ['Дата']).agg(daily_sum=('Кол-во', 'sum')).reset_index()
         ort_q_agg = daily_q.groupby(GROUP_KEYS).agg(
             Ortacha_Qoldiq=('daily_sum', 'mean')
         ).reset_index()
 
         seg_df = prod_lookup[GROUP_KEYS].drop_duplicates()
-        seg_df = pd.merge(seg_df, sotuv_agg, on=GROUP_KEYS, how='left')
-        seg_df = pd.merge(seg_df, hoz_q_agg, on=GROUP_KEYS, how='left')
-        seg_df = pd.merge(seg_df, ort_q_agg, on=GROUP_KEYS, how='left')
-        
+        seg_df = pd.merge(seg_df, sotuv_agg,  on=GROUP_KEYS, how='left')
+        seg_df = pd.merge(seg_df, hoz_q_agg,  on=GROUP_KEYS, how='left')
+        seg_df = pd.merge(seg_df, ort_q_agg,  on=GROUP_KEYS, how='left')
         seg_df.fillna(0, inplace=True)
 
-        def apply_dax(row):
-            prodano = float(row['Продано'])
-            hoz_q = float(row['Hozirgi_Qoldiq'])
-            ort_q = float(row['Ortacha_Qoldiq'])
-            
-            bugun = datetime.now()
-            oy_boshi_dt = bugun.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            otgan_kunlar = (bugun - oy_boshi_dt).days
-            if otgan_kunlar == 0: otgan_kunlar = 1
-            
-            kunlik = prodano / otgan_kunlar
-            obr = prodano / ort_q if ort_q > 0 else 0
+        # --- VECTORIZED apply_dax (apply() o'rniga) ---
+        bugun       = datetime.now()
+        oy_boshi_dt = bugun.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        otgan_kunlar = max((bugun - oy_boshi_dt).days, 1)
 
-            if obr >= 2.0:   target_days, modifier = 25, 1.50
-            elif obr >= 1.5: target_days, modifier = 22, 1.35
-            elif obr >= 1.2: target_days, modifier = 18, 1.20
-            elif obr >= 1.0: target_days, modifier = 18, 1.10
-            elif obr >= 0.7: target_days, modifier = 14, 1.00
-            elif obr >= 0.5: target_days, modifier = 14, 0.90
-            elif obr >= 0.3: target_days, modifier = 7,  0.75
-            elif obr > 0:    target_days, modifier = 7,  0.60
-            else:            target_days, modifier = 0,  0.60
+        prodano = seg_df['Продано'].astype(float).values
+        hoz_q_v = seg_df['Hozirgi_Qoldiq'].astype(float).values
+        ort_q_v = seg_df['Ortacha_Qoldiq'].astype(float).values
 
-            kerakli_qoldiq = kunlik * target_days * modifier
-            xom_zakaz = kerakli_qoldiq - hoz_q
-            stock_days = hoz_q / kunlik if kunlik > 0 else 999
+        kunlik = prodano / otgan_kunlar
+        obr    = np.where(ort_q_v > 0, prodano / ort_q_v, 0.0)
 
-            if kunlik == 0 or stock_days >= target_days or xom_zakaz <= 0:
-                zakaz = 0
-            else:
-                zakaz = int(round(xom_zakaz, -1)) 
+        conditions = [
+            obr >= 2.0,
+            obr >= 1.5,
+            obr >= 1.2,
+            obr >= 1.0,
+            obr >= 0.7,
+            obr >= 0.5,
+            obr >= 0.3,
+            obr >  0.0,
+        ]
+        target_days_vals = [25, 22, 18, 18, 14, 14,  7,  7]
+        modifier_vals    = [1.50, 1.35, 1.20, 1.10, 1.00, 0.90, 0.75, 0.60]
 
-            return pd.Series({
-                'OBR %': f"{int(round(obr * 100))}%",
-                'Zakaz': zakaz
-            })
+        target_days = np.select(conditions, target_days_vals, default=0).astype(float)
+        modifier    = np.select(conditions, modifier_vals,    default=0.60)
 
-        dax_res = seg_df.apply(apply_dax, axis=1)
-        seg_df = pd.concat([seg_df, dax_res], axis=1)
+        kerakli_qoldiq = kunlik * target_days * modifier
+        xom_zakaz      = kerakli_qoldiq - hoz_q_v
+        stock_days     = np.where(kunlik > 0, hoz_q_v / kunlik, 999.0)
 
-        # 🟢 MAKRO TAHLIL UCHUN Ortacha_Qoldiq NI SAQLAB QOLAMIZ
+        should_zero = (kunlik == 0) | (stock_days >= target_days) | (xom_zakaz <= 0)
+        raw_zakaz   = np.where(should_zero, 0.0, xom_zakaz)
+
+        seg_df['Zakaz'] = (np.round(raw_zakaz / 10) * 10).astype(int)
+        seg_df['OBR %'] = (np.round(obr * 100)).astype(int).astype(str) + '%'
+        # --- VECTORIZED tugadi ---
+
         cols = [
-            'Категория', 'Подкатегория', 'Наименование', 'Real_Sotuv_Segmenti', 
+            'Категория', 'Подкатегория', 'Наименование', 'Real_Sotuv_Segmenti',
             'Размер сетка', 'Материал2', 'Вид2', 'Пол',
             'Zakaz', 'Hozirgi_Qoldiq', 'Продано', 'OBR %', 'Ortacha_Qoldiq'
         ]
         result_df = seg_df[cols].copy()
 
-        result_df['Zakaz'] = result_df['Zakaz'].astype(int)
+        result_df['Zakaz']          = result_df['Zakaz'].astype(int)
         result_df['Hozirgi_Qoldiq'] = result_df['Hozirgi_Qoldiq'].astype(int)
-        result_df['Продано'] = result_df['Продано'].astype(int)
+        result_df['Продано']        = result_df['Продано'].astype(int)
 
-        # Razmer bo'yicha tartiblash
         result_df['Размер сетка'] = result_df['Размер сетка'].astype(str).fillna('').str.strip()
-        result_df['Размер_sort_key'] = result_df['Размер сетка'].apply(lambda x: int(x.split('-')[0]) if '-' in x and x.split('-')[0].isdigit() else (int(x) if x.isdigit() else 9999))
-
+        result_df['Размер_sort_key'] = result_df['Размер сетка'].apply(
+            lambda x: int(x.split('-')[0]) if '-' in x and x.split('-')[0].isdigit()
+            else (int(x) if x.isdigit() else 9999)
+        )
         result_df = result_df.sort_values(
             by=['Категория', 'Подкатегория', 'Наименование', 'Real_Sotuv_Segmenti', 'Размер_sort_key'],
             ascending=True
         ).reset_index(drop=True)
-        
-        result_df = result_df.drop(columns=['Размер_sort_key']) 
+        result_df = result_df.drop(columns=['Размер_sort_key'])
 
         return result_df
 

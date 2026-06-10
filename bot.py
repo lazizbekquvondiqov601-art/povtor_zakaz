@@ -37,8 +37,69 @@ import config
 import db_manager
 import data_engine
 # Buni esa importlardan keyin, bot=Bot(...) dan oldinroqqa qo'ying
-OBR_CACHE = {}
-STAT_CACHE = {}
+# TTLCache klassi
+import time
+
+class TTLCache:
+    def __init__(self, ttl=1800):
+        self._store = {}
+        self.ttl = ttl
+    def set(self, key, value):
+        self._store[key] = (value, time.monotonic())
+    def get(self, key, default=None):
+        item = self._store.get(key)
+        if item is None: return default
+        value, ts = item
+        if time.monotonic() - ts > self.ttl:
+            del self._store[key]
+            return default
+        return value
+    def __setitem__(self, key, value): self.set(key, value)
+    def __getitem__(self, key):
+        r = self.get(key)
+        if r is None: raise KeyError(key)
+        return r
+    def __contains__(self, key): return self.get(key) is not None
+    def cleanup(self):
+        now = time.monotonic()
+        expired = [k for k,(_, ts) in self._store.items() if now-ts > self.ttl]
+        for k in expired: del self._store[k]
+    def __len__(self): return len(self._store)
+
+OBR_CACHE  = TTLCache(ttl=1800)
+STAT_CACHE = TTLCache(ttl=1800)
+
+DONA_CATS = {'Аксессуары', 'Головной убор', 'Игрушка', 'Нижнее белье'}
+
+def build_caption(article, group, first, color_type, pending_df=None):
+    icon   = {'white': '📦', 'yellow': '🟡', 'red': '🔴'}.get(color_type, '📦')
+    subcat = str(first.get('subcategory', '-')).strip()
+    unit   = 'dona' if str(first.get('category', '')).strip() in DONA_CATS else 'pochka'
+
+    warning = ''
+    if color_type == 'white' and pending_df is not None and not pending_df.empty:
+        match = pending_df[pending_df['artikul'] == article]
+        if not match.empty:
+            warning = f"\n⚠️ <b>Eslatma:</b> {int(match['quantity'].sum())} ta yo'lda."
+
+    caption = f"{icon} <b>{article}</b>\n<i>{subcat}</i>{warning}\n"
+
+    if color_type == 'white':
+        price = first.get('supply_price', 0)
+        try:    price_str = f"{float(price):,.0f}".replace(',', ' ')
+        except: price_str = '0'
+        caption += f"👤 {first.get('supplier', '-')}\n💵 {price_str} so'm\n"
+    elif color_type in ('yellow', 'red'):
+        caption += f"({first.get('supplier', 'Noma\u02bclum')})\n"
+
+    for shop, s_group in group.groupby('shop'):
+        caption += f"\n🏪 <b>{shop}:</b>"
+        for _, row in s_group.iterrows():
+            qoldiq = int(float(row.get('hozirgi_qoldiq', 0) or 0))
+            sotuv  = int(float(row.get('prodano', 0) or 0))
+            caption += f"\n  - {row.get('color','-')}: <b>{int(row.get('quantity',0))} {unit}</b> (Q:{qoldiq}) (S:{sotuv})"
+
+    return caption
 # --- Bot sozlamalari ---
 bot = Bot(token=config.TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 class SecurityMiddleware(BaseMiddleware):
@@ -492,7 +553,6 @@ async def obr_seg_detail_click(callback: CallbackQuery):
         await callback.answer("⚠️ Bu segmentda zakaz ehtiyoji yo'q.", show_alert=True)
         return
 
-    # --- Razmer sort ---
     def razmer_sort_key(r):
         r = str(r).strip()
         if '-' in r:
@@ -503,10 +563,6 @@ async def obr_seg_detail_click(callback: CallbackQuery):
 
     seg_df['_razmer_sort'] = seg_df['Размер сетка'].apply(razmer_sort_key)
 
-    # --- Jins ustunini olish (Пол dan) ---
-    # auto_zakaz.py da Пол ustuni d_mahsulotlar dan olinadi
-    # calculate_auto_zakaz da GROUP_KEYS ga Пол qo'shish kerak bo'ladi
-    # Hozircha df da Пол bo'lsa ishlatamiz, bo'lmasa Вид2 ga tushamiz
     if 'Пол' in seg_df.columns:
         seg_df['_jins'] = seg_df['Пол'].fillna('').astype(str).str.strip()
     elif 'Вид2' in seg_df.columns:
@@ -514,10 +570,8 @@ async def obr_seg_detail_click(callback: CallbackQuery):
     else:
         seg_df['_jins'] = 'Универсал'
 
-    # Bo'sh qiymatlarni Универсал ga almashtirish
     seg_df['_jins'] = seg_df['_jins'].replace('', 'Универсал')
 
-    # --- Normalizatsiya ---
     JINS_NORMALIZE = {
         'Девочек': 'Девочки',
         'Мальчик': 'Мальчики',
@@ -543,35 +597,32 @@ async def obr_seg_detail_click(callback: CallbackQuery):
     jinslar_sorted = sorted(seg_df['_jins'].unique(), key=jins_sort_key)
 
     text_blocks = []
-    header = f"📦 <b>{sub_name}</b>\n<i>{seg_name}</i>\n\n"
+    header = f"📦 <b>{sub_name}</b>\n\n"
     current_text = header
 
     for jins in jinslar_sorted:
         jins_df = seg_df[seg_df['_jins'] == jins]
         icon = JINS_ICONS.get(jins, '👤')
 
-        jins_header = f"{icon} <b>{jins if jins else 'Универсал'}:</b>\n"
-
-        if len(current_text) + len(jins_header) > 4000:
-            text_blocks.append(current_text)
-            current_text = header + jins_header
-        else:
-            current_text += jins_header
-
         for _, row in jins_df.iterrows():
             razmer = str(row.get('Размер сетка', '')).strip() or "Noma'lum"
             mat    = str(row.get('Материал2', '')).strip() or "—"
+            vid    = str(row.get('Вид2', '')).strip() or "—"
+            nom    = str(row.get('Наименование', '')).strip() or "—"
             zakaz  = row.get('Zakaz', 0)
             qoldiq = row.get('Hozirgi_Qoldiq', 0)
             sotuv  = row.get('Продано', 0)
             obr    = row.get('OBR %', '0%')
 
             item_text = (
-                f"  <b>{razmer}</b>\n"
-                f"  <b>{razmer}</b> | {mat}\n"
-                f"  Sotuv: <b>{sotuv}</b> | Qoldiq: <b>{qoldiq}</b> | OBR: <b>{obr}</b>\n"
-                f"  🛒 <b>ZAKAZ: {zakaz} ta</b>\n"
-                "  ──────────\n"
+                f" {icon} {jins}\n\n"
+                f" 📌 <b><i>{nom}</i></b>\n"
+                f"{seg_name}|📐 <b>{razmer} yosh </b>|  {mat}  | 🎨 {vid} |\n"
+                
+                f"  🛒 <b>ZAKAZ: {zakaz} ta</b>\n\n"
+
+                f"  | Sotuv: <b>{sotuv}</b> | Qoldiq: <b>{qoldiq}</b> | OBR: <b>{obr}</b> |\n"
+                "  ──────────────────────\n"
             )
 
             if len(current_text) + len(item_text) > 4000:
@@ -754,61 +805,163 @@ async def report_logic(message: types.Message):
     await message.answer_document(file, caption="✅ Hisobot tayyor.")
 
 
+@dp.message(IsAdmin(), Command("test_vid"))
+async def test_vid(message: Message):
+    with db_manager.engine.connect() as conn:
+        rows = conn.execute(text('''
+            SELECT "Вид", COUNT(*) as soni
+            FROM d_mahsulotlar
+            WHERE "Подкатегория" = 'Двойка'
+            GROUP BY "Вид"
+            ORDER BY soni DESC
+            LIMIT 10
+        ''')).fetchall()
+    text_out = "\n".join([f"{r[0] or 'NULL'}: {r[1]}" for r in rows])
+    await message.answer(f"<pre>{text_out}</pre>")
+def generate_sales_table_image(asosiy: dict, aksiya: dict, qoldiq: dict, aks_qoldiq: dict, label: str):
+    def fmt_money(val):
+        return f"{int(val):,}".replace(",", " ")
 
-# test uchun
-def generate_sales_chart(asosiy, aksiya, label):
-    """Sotuv tahlilidan olingan ma'lumotlar asosida chiroyli grafik yaratadi"""
-    # 1. Asosiy va Aksiya daromadlarini bitta ro'yxatga yig'amiz
-    profits = {}
+    all_cats = sorted(set(list(asosiy.keys()) + list(aksiya.keys())))
     
-    if asosiy:
-        for cat, data in asosiy.items():
-            profits[cat] = profits.get(cat, 0) + data['profit']
-    if aksiya:
-        for cat, data in aksiya.items():
-            profits[cat] = profits.get(cat, 0) + data['profit']
-            
-    if not profits:
-        return None
+    rows = []
+    total_qoldiq = total_sotuv = total_foyda = 0
+    total_aks_sotuv = total_aks_foyda = 0
 
-    # 2. Foyda bo'yicha o'sish tartibida saralaymiz (grafikda eng kattasi tepada turishi uchun)
-    sorted_profits = sorted(profits.items(), key=lambda x: x[1])
-    
-    categories = [x[0] for x in sorted_profits]
-    values = [x[1] for x in sorted_profits]
+    for cat in all_cats:
+        if cat == 'Boshqa tovarlar':
+            continue
+        a  = asosiy.get(cat, {})
+        ax = aksiya.get(cat, {})
+        q      = qoldiq.get(cat, 0)
+        aks_q  = aks_qoldiq.get(cat, 0)
+        qoldiq_qty     = int(q)
+        aks_qoldiq_qty = int(aks_q)
 
-    # 3. Grafik dizaynini tayyorlaymiz
-    plt.figure(figsize=(10, 7))
-    plt.style.use('ggplot') # Chiroyli fon va setkalar
-    
-    # Ustunlarni chizish
-    bars = plt.barh(categories, values, color='#2fa1b3', edgecolor='black')
-    
-    # Sarlavha va o'qlarni yozish
-    plt.title(f"Kategoriyalar bo'yicha sof foyda\n({label})", fontsize=15, fontweight='bold', pad=20)
-    plt.xlabel("Foyda miqdori (so'm)", fontsize=12, fontweight='bold')
-    
-    # Pastki o'qni (X o'qi) chiroyli son formatiga o'tkazish (masalan: 20 000 000)
-    formatter = ticker.FuncFormatter(lambda x, pos: f"{int(x):,} ".replace(",", " "))
-    plt.gca().xaxis.set_major_formatter(formatter)
-    
-    # Har bir ustun oxiriga summani aniq yozib qo'yish
-    for bar in bars:
-        width = bar.get_width()
-        plt.text(width + (max(values) * 0.01),  # Matn biroz o'ngroqda turadi
-                 bar.get_y() + bar.get_height()/2, 
-                 f"{int(width):,} so'm".replace(",", " "), 
-                 va='center', ha='left', fontsize=11, fontweight='bold', color='black')
+        sotuv_qty  = int(a.get('qty', 0))
+        sotuv_prof = int(a.get('profit', 0))
+        aks_qty    = int(ax.get('qty', 0))
+        aks_prof   = int(ax.get('profit', 0))
+        qoldiq_qty = int(q)
 
-    plt.tight_layout()
+        total_qoldiq    += qoldiq_qty
+        total_sotuv     += sotuv_qty
+        total_foyda     += sotuv_prof
+        total_aks_sotuv += aks_qty
+        total_aks_foyda += aks_prof
 
-    # 4. Rasmni xotiraga (RAM) saqlash (fayl qilib kompyuterga saqlamaymiz, tez ishlaydi)
+        total_stock = sotuv_qty + qoldiq_qty
+        obr = int(sotuv_qty / total_stock * 100) if total_stock > 0 else 0
+
+        rows.append([
+            cat[:16],
+            f"{qoldiq_qty}",
+            f"{sotuv_qty}",
+            fmt_money(sotuv_prof),
+            f"{obr}%",
+            f"{aks_qoldiq_qty}" if aks_qoldiq_qty > 0 else "—",
+            f"{aks_qty}"        if aks_qty > 0        else "—",
+            fmt_money(aks_prof) if aks_prof > 0        else "—",
+        ])
+
+    total_stock_all = total_sotuv + total_qoldiq
+    total_obr = int(total_sotuv / total_stock_all * 100) if total_stock_all > 0 else 0
+
+    rows.append([
+        "JAMI",
+        f"{total_qoldiq}",
+        f"{total_sotuv}",
+        fmt_money(total_foyda),
+        f"{total_obr}%",
+        f"{sum(aks_qoldiq.values()):.0f}",
+        f"{total_aks_sotuv}",
+        fmt_money(total_aks_foyda),
+    ])
+    col_labels = ["Kategoriya", "Qoldiq", "Sotildi", "Foyda", "OBR%", "AksQoldiq", "AksSot.", "AksFoyda"]
+
+    n_rows = len(rows)
+    fig_h  = 0.42 * (n_rows + 1) + 1.2
+    fig, ax = plt.subplots(figsize=(9, fig_h))
+    ax.axis('off')
+
+    fig.text(0.03, 0.98, "📊  SOTUV TAHLILI",
+             fontsize=13, fontweight='bold', va='top', color='#1a1a1a')
+    fig.text(0.03, 0.93, f"📅  {label}", fontsize=10, va='top', color='#555555')
+
+    table = ax.table(
+        cellText=rows, colLabels=col_labels,
+        cellLoc='center', loc='center'
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1, 1.6)
+
+    col_widths = [0.24, 0.11, 0.11, 0.18, 0.10, 0.11, 0.18]
+    for j, w in enumerate(col_widths):
+        for i in range(n_rows + 1):
+            table[i, j].set_width(w)
+
+    for (r, c), cell in table.get_celld().items():
+        cell.set_edgecolor('#dddddd')
+        cell.set_linewidth(0.5)
+
+        if r == 0:
+            cell.set_facecolor('#2C3E50')
+            cell.set_text_props(color='white', fontweight='bold', fontsize=8.5)
+        elif r == n_rows:
+            cell.set_facecolor('#ECF0F1')
+            cell.set_text_props(fontweight='bold')
+        else:
+            bg = '#ffffff' if r % 2 == 1 else '#f9f9f9'
+
+            if c == 1:  # Qoldiq
+                try:
+                    val = int(rows[r-1][1])
+                    if val == 0:
+                        cell.set_facecolor('#ffebee')
+                        cell.set_text_props(color='#b71c1c', fontweight='bold')
+                    elif val < 100:
+                        cell.set_facecolor('#fff3e0')
+                        cell.set_text_props(color='#e65100')
+                    else:
+                        cell.set_facecolor('#e3f2fd')
+                        cell.set_text_props(color='#0d47a1')
+                except:
+                    cell.set_facecolor(bg)
+
+            elif c == 3:  # Foyda
+                cell.set_facecolor('#e8f5e9' if r % 2 == 1 else '#f1f8e9')
+                cell.set_text_props(color='#1b5e20')
+
+            elif c == 4:  # OBR%
+                try:
+                    obr_val = int(rows[r-1][4].replace('%', ''))
+                    if obr_val >= 20:
+                        cell.set_facecolor('#d4edda')
+                        cell.set_text_props(color='#155724', fontweight='bold')
+                    elif obr_val >= 10:
+                        cell.set_facecolor('#fff3cd')
+                        cell.set_text_props(color='#856404', fontweight='bold')
+                    else:
+                        cell.set_facecolor('#f8d7da')
+                        cell.set_text_props(color='#721c24', fontweight='bold')
+                except:
+                    cell.set_facecolor(bg)
+
+            elif c == 6:  # AksFoyda
+                cell.set_facecolor('#fce4ec' if r % 2 == 1 else '#fdf2f5')
+                cell.set_text_props(color='#880e4f')
+            else:
+                cell.set_facecolor(bg)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.90])
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=150)
+    plt.savefig(buf, format='png', dpi=160, bbox_inches='tight',
+                facecolor='white', edgecolor='none')
     buf.seek(0)
-    plt.close()
-    
+    plt.close(fig)
     return buf
+
 
 def get_inline_calendar(year: int, month: int, state_label: str) -> InlineKeyboardMarkup:
     """Telegram inline klaviaturasi shaklida oylik kalendar yaratadi"""
@@ -1173,8 +1326,6 @@ async def process_calendar_selection(callback: CallbackQuery, state: FSMContext)
                     f"⚠️ <b>{start_str} — {end_str}</b> kunlarida import topilmadi."
                 )
 async def show_sales_result(message, start_date: str, end_date: str, label: str):
-    print(f"🔍 show_sales_result chaqirildi: {label}")
-    
     asosiy, aksiya = await asyncio.to_thread(
         db_manager.get_sales_by_period, start_date, end_date
     )
@@ -1182,92 +1333,31 @@ async def show_sales_result(message, start_date: str, end_date: str, label: str)
     if not asosiy and not aksiya:
         await message.edit_text(f"⚠️ <b>{label}</b>\nMa'lumot topilmadi.")
         return
-    
-    def format_money(val):
-        return f"{int(val):,}".replace(",", " ")
 
-    def pad_str(text, length, align='left'):
-        text = str(text)
-        if len(text) > length:
-            text = text[:length-2] + ".." 
-        if align == 'left':
-            return text.ljust(length)
-        return text.rjust(length)
+    # Qoldiqni alohida olamiz
+    asosiy_qoldiq, aksiya_qoldiq = await asyncio.to_thread(db_manager.get_stock_by_category)
 
-    text = f"📊 <b>SOTUV TAHLILI</b>\n"
-    text += f"📅 Davr: <b>{label}</b>\n\n"
-    
-    # --- ASOSIY TOVARLAR ---
-    text += "🏢 <b>ASOSIY TOVARLAR:</b>\n"
-    total_asosiy_qty = 0
-    total_asosiy_profit = 0
-    
-    if asosiy:
-        text += "<pre>\n"
-        text += "Kategoriya     | Soni  |       Foyda\n"
-        text += "-" * 36 + "\n"
-        for cat, data in sorted(asosiy.items()):
-            c_name = pad_str(cat, 14, 'left')
-            c_qty = pad_str(int(data['qty']), 5, 'right')
-            c_prof = pad_str(format_money(data['profit']), 11, 'right')
-            text += f"{c_name} | {c_qty} | {c_prof}\n"
-            total_asosiy_qty += data['qty']
-            total_asosiy_profit += data['profit']
-            
-        text += "-" * 36 + "\n"
-        text += f"JAMI           | {pad_str(int(total_asosiy_qty), 5, 'right')} | {pad_str(format_money(total_asosiy_profit), 11, 'right')}\n"
-        text += "</pre>\n"
-    else:
-        text += " <i>Ma'lumot yo'q</i>\n\n"
-    
-    # --- AKSIYA TOVARLAR ---
-    text += "🎁 <b>AKSIYA TOVARLAR (010/011):</b>\n"
-    total_aksiya_qty = 0
-    total_aksiya_profit = 0
-    
-    if aksiya:
-        text += "<pre>\n"
-        text += "Kategoriya     | Soni  |       Foyda\n"
-        text += "-" * 36 + "\n"
-        for cat, data in sorted(aksiya.items()):
-            c_name = pad_str(cat, 14, 'left')
-            c_qty = pad_str(int(data['qty']), 5, 'right')
-            c_prof = pad_str(format_money(data['profit']), 11, 'right')
-            text += f"{c_name} | {c_qty} | {c_prof}\n"
-            total_aksiya_qty += data['qty']
-            total_aksiya_profit += data['profit']
-            
-        text += "-" * 36 + "\n"
-        text += f"JAMI           | {pad_str(int(total_aksiya_qty), 5, 'right')} | {pad_str(format_money(total_aksiya_profit), 11, 'right')}\n"
-        text += "</pre>\n"
-    else:
-        text += " <i>Ma'lumot yo'q</i>\n\n"
-    
-    text += "━━━━━━━━━━━━━━\n"
-    text += f"🚛 <b>UMUMIY JAMI: {int(total_asosiy_qty + total_aksiya_qty)} dona</b>\n"
-    text += f"💵 <b>UMUMIY FOYDA: {format_money(total_asosiy_profit + total_aksiya_profit)} so'm</b>"
-    
+    chart_buf = await asyncio.to_thread(
+        generate_sales_table_image, asosiy, aksiya, asosiy_qoldiq, aksiya_qoldiq, label
+    )
+
     kb = [[InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_sotuv")],
           [InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")]]
-    
-    # --- Rasm chizish jarayoni ---
-    chart_buf = await asyncio.to_thread(generate_sales_chart, asosiy, aksiya, label)
-    
-    # Agar rasm muvaffaqiyatli chizilsa
+
     if chart_buf:
-        photo = BufferedInputFile(chart_buf.getvalue(), filename="chart.png")
-        # 1. Avval "yuklanmoqda..." xabarini o'chiramiz
+        photo = BufferedInputFile(chart_buf.getvalue(), filename="sales.png")
         await message.delete()
-        
-        # 2. Rasmni yuboramiz
-        await bot.send_photo(chat_id=message.chat.id, photo=photo, caption="📈 <b>Foyda tahlili grafigi</b>")
-        
-        # 3. Ostidan chiroyli matnli jadvalni va tugmalarni yuboramiz
-        await bot.send_message(chat_id=message.chat.id, text=text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        await bot.send_photo(
+            chat_id=message.chat.id,
+            photo=photo,
+            caption=f"📊 <b>SOTUV TAHLILI</b>\n📅 <b>{label}</b>",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        )
     else:
-        # Agar rasm chizishda nimadir xato ketsa, faqat matnni o'zini yangilab qo'yaqoladi
-        await message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-# --- ORQAGA QAYTISH ---
+        await message.edit_text("❌ Jadval yaratishda xatolik.",
+                                reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+
 @dp.callback_query(F.data == "stat_back")
 async def stat_back(callback: CallbackQuery):
     kb = [
@@ -1431,55 +1521,60 @@ async def my_orders_text(message: types.Message):
 
 @dp.message(F.text == "⏳ Jarayonda")
 async def pending_orders_text(message: types.Message):
-    # 1. Bazadan faqat 'Topdim' statusli Kategoriyalarni olamiz
-    query = "SELECT DISTINCT category FROM generated_orders WHERE status = 'Topdim' ORDER BY category"
-    cats_df = pd.read_sql(query, db_manager.engine)
-    
+    def _get_cats():
+        return pd.read_sql(
+            "SELECT DISTINCT category FROM generated_orders WHERE status = 'Topdim' ORDER BY category",
+            db_manager.engine
+        )
+
+    cats_df = await asyncio.to_thread(_get_cats)
+
     if cats_df.empty:
         await message.answer("✅ Jarayonda (Yo'lda) hech qanday zakaz yo'q.")
         return
 
     kb = []
     for cat in cats_df['category']:
-        # Uzun nomlar uchun ID ishlatamiz (xuddi Import Tahlilidek)
         unique_id = str(uuid.uuid4())[:8]
-        STAT_CACHE[unique_id] = cat
+        STAT_CACHE.set(unique_id, cat)
         kb.append([InlineKeyboardButton(text=f"📂 {cat}", callback_data=f"pendCat_{unique_id}")])
     kb.append([InlineKeyboardButton(text="📥 Sklad uchun Excel (Billz Import)", callback_data="download_sklad_excel")])
     kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
-    
-    
+
     await message.answer(
-        "⏳ <b>JARAYONDA (YO'LDA)</b>\nQaysi bo'limni ko'rmoqchisiz?", 
+        "⏳ <b>JARAYONDA (YO'LDA)</b>\nQaysi bo'limni ko'rmoqchisiz?",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
 @dp.callback_query(F.data.startswith("pendCat_"))
 async def pending_category_click(callback: CallbackQuery):
-    uid = callback.data.split("_")[1]
+    uid      = callback.data.split("_")[1]
     category = STAT_CACHE.get(uid)
-    
+
     if not category:
         await callback.answer("⚠️ Eskirgan ma'lumot.", show_alert=True)
         return
 
-    # Podkategoriyalarni olamiz
-    query = "SELECT DISTINCT subcategory FROM generated_orders WHERE status = 'Topdim' AND category =:cat ORDER BY subcategory"
-    subs_df = pd.read_sql(query, db_manager.engine, params={"cat": category})
-    
+    def _get_subs():
+        return pd.read_sql(
+            """SELECT DISTINCT subcategory FROM generated_orders
+               WHERE status = 'Topdim' AND category = :cat ORDER BY subcategory""",
+            db_manager.engine, params={"cat": category}
+        )
+
+    subs_df = await asyncio.to_thread(_get_subs)
+
     kb = []
     for sub in subs_df['subcategory']:
         unique_id = str(uuid.uuid4())[:8]
-        STAT_CACHE[unique_id] = (category, sub) # Ikkalasini saqlaymiz
+        STAT_CACHE.set(unique_id, (category, sub))
         kb.append([InlineKeyboardButton(text=f"🔹 {sub}", callback_data=f"pendSub_{unique_id}")])
-    
     kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_to_pend_cats")])
-    
+
     await callback.message.edit_text(
         f"📂 <b>{category}</b> (Jarayonda)\nPodkategoriyani tanlang:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
-
 # Orqaga qaytish (Kategoriyalarga)
 @dp.callback_query(F.data == "back_to_pend_cats")
 async def back_pend_cats(callback: CallbackQuery):
@@ -1529,51 +1624,26 @@ async def pending_subcategory_click(callback: CallbackQuery):
     kb = [[InlineKeyboardButton(text="🔄 Boshqa bo'lim", callback_data="back_to_pend_cats")]]
     await bot.send_message(callback.message.chat.id, "✅ Ro'yxat tugadi.", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
-# Yordamchi funksiya (Kod takrorlanmasligi uchun)
 async def show_pending_group(message, df, title, color_type):
     await bot.send_message(message.chat.id, title)
-    grouped = df.groupby('artikul')
-    
-    for article, group in grouped:
-        first = group.iloc[0]
-        # Bekor qilish tugmasi
-        kb = [[InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_order:{article}")]]
-        
-        icon = "🔴" if color_type == "red" else "🟡"
-        # Supplier nomini ham chiqaramiz (Kim olib kelayotganini bilish uchun)
-        supplier_name = first.get('supplier', 'Noma\'lum')
-        
-        # Podkategoriyani olamiz
-        subcat_val = str(first.get('subcategory', '-')).strip()
-        
-        caption = f"{icon} <b>{article}</b> ({supplier_name})\n<i>{subcat_val}</i>\n"
 
-        for shop, s_group in group.groupby('shop'):
-                    caption += f"\n🏪 <b>{shop}:</b>"
-                    for _, row in s_group.iterrows():
-                        dona_cats = ['Аксессуары', 'Головной убор', 'Игрушка', 'Нижнее белье']
-                        cat_name = str(first.get('category', '')).strip()
-                        unit_name = "dona" if cat_name in dona_cats else "pochka"
-                        
-                        raw_qoldiq = row.get('hozirgi_qoldiq', 0)
-                        qoldiq = int(float(raw_qoldiq)) if pd.notna(raw_qoldiq) else 0
-                        
-                        # 🟢 SOTUV SONINI OLISH (S) 🟢
-                        raw_prodano = row.get('prodano', 0)
-                        sotuv = int(float(raw_prodano)) if pd.notna(raw_prodano) else 0
-                        
-                        caption += f"\n  - {row.get('color','-')}: <b>{int(row.get('quantity',0))} {unit_name}</b> (Q:{qoldiq}) (S:{sotuv})"
+    for article, group in df.groupby('artikul'):
+        first   = group.iloc[0]
+        caption = build_caption(article, group, first, color_type)
+        kb = [[InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_order:{article}")]]
 
         photo = str(first.get('photo', ''))
         try:
             if photo.startswith('http'):
-                await bot.send_photo(message.chat.id, photo, caption=caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+                await bot.send_photo(message.chat.id, photo, caption=caption,
+                                     reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
             else:
-                await bot.send_message(message.chat.id, caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-        except:
-            await bot.send_message(message.chat.id, caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+                await bot.send_message(message.chat.id, caption,
+                                       reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        except Exception:
+            await bot.send_message(message.chat.id, caption,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
         await asyncio.sleep(0.2)
-
 @dp.message(F.text == "📝 Ismni o'zgartirish")
 async def change_name_text(message: types.Message, state: FSMContext):
     # 1-qadam: Mavjud bo'sh kategoriyalarni olish
@@ -1936,6 +2006,10 @@ async def scheduled_update_job():
     print("⏰ Avto-yangilash...")
     await asyncio.to_thread(data_engine.run_full_update)
 
+async def cleanup_caches():
+    OBR_CACHE.cleanup()
+    STAT_CACHE.cleanup()
+
 async def send_reminders():
     # Eslatma logikasi o'zgarishsiz qoladi, faqat asinxronlikka e'tibor bering
     pending = db_manager.get_pending_orders_for_reminder(24)
@@ -2210,28 +2284,21 @@ async def imp_cat_click(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("impSub_"))
 async def imp_sub_click(callback: CallbackQuery):
-    uid = callback.data.split("_")[1]
+    uid  = callback.data.split("_")[1]
     data = STAT_CACHE.get(uid)
-    if not data: return
-    
-    mn, mx, cat, sub = data
-    
-    # 1. Bazadan ma'lumot olamiz (Yangi 'Kutilmoqda' lar)
-    new_orders = await asyncio.to_thread(db_manager.get_import_orders_detailed, mn, mx, cat, sub)
-    
-    # 2. Sariq va Qizillarni olamiz ('Topdim' statusi)
-    # Buning uchun alohida funksiya yozish shart emas, shu yerdan filtrlaymiz
-    # Lekin get_import_orders_detailed faqat 'Kutilmoqda' ni qaytaradi.
-    # Bizga 'Topdim' ham kerak. 
-    # Keling, db_manager ga murojaat qilmasdan, to'g'ridan-to'g'ri SQL bilan olamiz (tezroq bo'ladi)
-    
+    if not data:
+        return
 
-    query = text("""
-    SELECT * FROM generated_orders 
-    WHERE category = :cat AND subcategory = :sub
-    """)
-    all_orders = pd.read_sql(query, db_manager.engine, params={"cat": cat, "sub": sub})
-    
+    mn, mx, cat, sub = data
+
+    def _get_orders():
+        return pd.read_sql(
+            text("SELECT * FROM generated_orders WHERE category = :cat AND subcategory = :sub"),
+            db_manager.engine, params={"cat": cat, "sub": sub}
+        )
+
+    all_orders = await asyncio.to_thread(_get_orders)
+
     if all_orders.empty:
         await callback.answer("⚠️ Ma'lumot topilmadi.", show_alert=True)
         return
@@ -2239,102 +2306,57 @@ async def imp_sub_click(callback: CallbackQuery):
     await callback.message.delete()
     await callback.message.answer(f"⏳ <b>{cat} > {sub}</b>\nMa'lumotlar yuklanmoqda...")
 
-    # --- GURUHLASH ---
-    # Qizil (Topdim + 3 kun o'tgan)
     now = datetime.now()
     all_orders['created_at_dt'] = pd.to_datetime(all_orders['created_at'])
-    
-    # Maska (Shartlar)
+
     is_topdim = all_orders['status'] == 'Topdim'
-    is_new = all_orders['status'] == 'Kutilmoqda'
-    is_late = (now - all_orders['created_at_dt']).dt.days >= 3
-    
-    red_df = all_orders[is_topdim & is_late].copy()
+    is_new    = all_orders['status'] == 'Kutilmoqda'
+    is_late   = (now - all_orders['created_at_dt']).dt.days >= 3
+
+    red_df    = all_orders[is_topdim & is_late].copy()
     yellow_df = all_orders[is_topdim & ~is_late].copy()
-    white_df = all_orders[is_new].copy()
+    white_df  = all_orders[is_new].copy()
 
-    # --- 1. QIZIL (MUAMMO) ---
     if not red_df.empty:
-        await message_sender(callback.message, red_df, "🚨 <b>DIQQAT! KECHIKKANLAR (3+ kun):</b>", "red")
-
-    # --- 2. OQ (YANGI) ---
+        await message_sender(callback.message, red_df,    "🚨 <b>DIQQAT! KECHIKKANLAR (3+ kun):</b>", "red")
     if not white_df.empty:
-        await message_sender(callback.message, white_df, "🔥 <b>YANGI EHTIYOJLAR:</b>", "white", pending_df=yellow_df)
-
-    # --- 3. SARIQ (JARAYONDA) ---
+        await message_sender(callback.message, white_df,  "🔥 <b>YANGI EHTIYOJLAR:</b>",              "white", pending_df=yellow_df)
     if not yellow_df.empty:
-        await message_sender(callback.message, yellow_df, "⏳ <b>JARAYONDA (Yo'lda):</b>", "yellow")
+        await message_sender(callback.message, yellow_df, "⏳ <b>JARAYONDA (Yo'lda):</b>",            "yellow")
 
-    # Tugatish menyusi
     kb = [[InlineKeyboardButton(text="🔄 Boshqa bo'lim", callback_data="impBack_root")]]
-    await bot.send_message(callback.message.chat.id, "✅ Ro'yxat tugadi.", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await bot.send_message(callback.message.chat.id, "✅ Ro'yxat tugadi.",
+                           reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
-# --- YORDAMCHI FUNKSIYA (Xabar chiqaruvchi) ---
 async def message_sender(message, df, title, color_type, pending_df=None):
     await bot.send_message(message.chat.id, title)
-    grouped = df.groupby('artikul')
-    
-    for article, group in grouped:
-        first = group.iloc[0]
-        price = first.get('supply_price', 0)
-        try: price_str = f"{float(price):,.0f}".replace(",", " ")
-        except: price_str = "0"
 
-        # Tugmalar
+    for article, group in df.groupby('artikul'):
+        first   = group.iloc[0]
+        caption = build_caption(article, group, first, color_type, pending_df)
+
         kb = []
-        if color_type == "white": # Yangi
-            kb.append([InlineKeyboardButton(text="✅ Topdim", callback_data=f"feedback:Topdim:{article}"),
-                       InlineKeyboardButton(text="❌ Topilmadi", callback_data=f"feedback:Topilmadi:{article}")])
-        elif color_type == "red" or color_type == "yellow": # Eski
-            kb.append([InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_order:{article}")])
-        
-        # Eslatma
-        warning = ""
-        if color_type == "white" and pending_df is not None:
-            match = pending_df[pending_df['artikul'] == article]
-            if not match.empty:
-                qty = match['quantity'].sum()
-                warning = f"\n⚠️ <b>Eslatma:</b> {int(qty)} ta yo'lda."
+        if color_type == 'white':
+            kb.append([
+                InlineKeyboardButton(text="✅ Topdim",    callback_data=f"feedback:Topdim:{article}"),
+                InlineKeyboardButton(text="❌ Topilmadi", callback_data=f"feedback:Topilmadi:{article}")
+            ])
+        else:
+            kb.append([
+                InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_order:{article}")
+            ])
 
-        # 🟢 MANA SHU YERDA PROBELLARDAN TOZALAB TEKSHIRAMIZ 🟢
-        dona_cats = ['Аксессуары', 'Головной убор', 'Игрушка', 'Нижнее белье']
-        cat_name = str(first.get('category', '')).strip() # .strip() bo'sh joylarni olib tashlaydi
-        unit_name = "dona" if cat_name in dona_cats else "pochka"
-
-        # Matn
-# Podkategoriyani olamiz
-        subcat_val = str(first.get('subcategory', '-')).strip()
-
-        icon = "🔴" if color_type == "red" else ("🟡" if color_type == "yellow" else "📦")
-        # Artikul tagiga qiya harflar bilan podkategoriyani qo'shamiz
-        caption = f"{icon} <b>{article}</b>\n<i>{subcat_val}</i>{warning}\n"
-        
-        if color_type == "white":
-            caption += f"👤 {first.get('supplier', '-')}\n💵 {price_str} so'm\n"
-        
-        for shop, s_group in group.groupby('shop'):
-                    caption += f"\n🏪 <b>{shop}:</b>"
-                    for _, row in s_group.iterrows():
-                        # Qoldiqni olish (Q)
-                        raw_qoldiq = row.get('hozirgi_qoldiq', 0)
-                        qoldiq = int(float(raw_qoldiq)) if pd.notna(raw_qoldiq) else 0
-                        
-                        # 🟢 SOTUV SONINI OLISH (S) 🟢
-                        raw_prodano = row.get('prodano', 0)
-                        sotuv = int(float(raw_prodano)) if pd.notna(raw_prodano) else 0
-                        
-                        # Yakuniy matn: 16 pochka (Q:57) (S:10)
-                        caption += f"\n  - {row.get('color','-')}: <b>{int(row.get('quantity', 0))} {unit_name}</b> (Q:{qoldiq}) (S:{sotuv})"
-
-        # Rasm
         photo = str(first.get('photo', ''))
         try:
             if photo.startswith('http'):
-                await bot.send_photo(message.chat.id, photo, caption=caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+                await bot.send_photo(message.chat.id, photo, caption=caption,
+                                     reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
             else:
-                await bot.send_message(message.chat.id, caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
-        except:
-            await bot.send_message(message.chat.id, caption, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+                await bot.send_message(message.chat.id, caption,
+                                       reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        except Exception:
+            await bot.send_message(message.chat.id, caption,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
         await asyncio.sleep(0.2)
 
 @dp.callback_query(F.data == "impBack_root")
@@ -2664,7 +2686,6 @@ async def stock_category_click(callback: CallbackQuery):
     
     await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
-# --- EXCEL FAYL YARATISH VA YUBORISH HANDLERI ---
 @dp.callback_query(F.data.startswith("downStockEx_"))
 async def download_stock_excel_handler(callback: CallbackQuery):
     target_date = callback.data.split("_")[1]  # "downStockEx_2024-01-15" → "2024" oladi!
@@ -2752,15 +2773,24 @@ async def confirm_db_reset_handler(callback: CallbackQuery):
 
 
 async def main():
-    db_manager.init_db()
-    await bot.delete_webhook(drop_pending_updates=True)
+    import time
     
-    # Avtomatik vazifalar (Jadvallar)
+    t0 = time.monotonic()
+    db_manager.init_db()
+    print(f"⏱ init_db: {time.monotonic()-t0:.2f}s")
+
+    t1 = time.monotonic()
+    await bot.delete_webhook(drop_pending_updates=True)
+    print(f"⏱ delete_webhook: {time.monotonic()-t1:.2f}s")
+
     scheduler = AsyncIOScheduler(timezone="Asia/Tashkent")
     scheduler.add_job(scheduled_update_job, 'cron', hour=3, minute=0)
+    scheduler.add_job(cleanup_caches, 'interval', minutes=10)
     scheduler.add_job(send_reminders, 'cron', hour=10, minute=0)
+    
     scheduler.start()
     
+    print(f"⏱ Jami start: {time.monotonic()-t0:.2f}s")
     print("🤖 Bot ishga tushdi...")
     await dp.start_polling(bot)
 
