@@ -9,8 +9,31 @@ import src.database.db_manager as db_manager
 from src.bot.states.bot_states import AdminStates
 from src.bot.handlers.common import send_welcome
 
+from src.bot.keyboards.admin import get_admin_keyboard, get_system_tools_keyboard, get_users_management_keyboard
+
 logger = logging.getLogger(__name__)
 router = Router()
+
+@router.message(F.text == "🛠 Tizim Sozlamalari")
+async def system_tools_menu(message: Message):
+    if message.from_user.id != config.SUPER_ADMIN_ID: return
+    is_locked = db_manager.is_global_locked()
+    await message.answer(
+        "🛠 <b>Tizim Sozlamalari</b>\n\nBu bo'limda tizimni boshqarish va yangilash buyruqlari joylashgan:",
+        reply_markup=get_system_tools_keyboard(is_locked)
+    )
+
+@router.message(F.text == "👥 Foydalanuvchilar")
+async def users_management_menu(message: Message):
+    if message.from_user.id != config.SUPER_ADMIN_ID: return
+    await message.answer(
+        "👥 <b>Foydalanuvchilarni Boshqarish</b>\n\nVIP huquqlar va bloklash amallari:",
+        reply_markup=get_users_management_keyboard()
+    )
+
+@router.message(F.text == "⬅️ Orqaga")
+async def back_to_main_menu(message: Message, state: FSMContext):
+    await send_welcome(message, state)
 
 @router.message(F.text.in_(["🔴 Tizimni YOPISH", "🟢 Tizimni OCHISH"]))
 async def toggle_system_lock(message: Message, state: FSMContext):
@@ -22,7 +45,12 @@ async def toggle_system_lock(message: Message, state: FSMContext):
     db_manager.set_global_lock(should_lock)
     
     await message.answer(f"✅ Bajarildi! Hozir: {'🚫 Tizim YOPIQ' if should_lock else '✅ Tizim OCHIQ'}")
-    await send_welcome(message, state) 
+    # Update the keyboard in-place instead of full welcome
+    await message.answer("Menyu yangilandi:", reply_markup=get_system_tools_keyboard(should_lock))
+
+@router.message(F.text == "🗑 Bazani Tozalash")
+async def reset_db_command(message: Message):
+    await reset_db_handler(message)
 
 # --- BLOKLASH ---
 
