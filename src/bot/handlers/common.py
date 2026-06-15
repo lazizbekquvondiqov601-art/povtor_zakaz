@@ -5,7 +5,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 
 import config
-import db_manager
+import src.database.db_manager as db_manager
 from src.bot.init_bot import bot
 from src.bot.keyboards.admin import get_admin_keyboard
 from src.bot.keyboards.supplier import get_supplier_keyboard

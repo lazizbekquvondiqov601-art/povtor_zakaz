@@ -11,7 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram import Bot
 
-import db_manager
+import src.database.db_manager as db_manager
 import auto_zakaz
 
 TASHKENT_TZ = timezone(timedelta(hours=5))

@@ -11,7 +11,7 @@ import json
 import os
 import time
 import warnings
-import db_manager
+import src.database.db_manager as db_manager
 
 import config
 

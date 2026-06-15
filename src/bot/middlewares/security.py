@@ -3,7 +3,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Message, CallbackQuery
 from typing import Callable, Dict, Any, Awaitable
 import config
-import db_manager
+import src.database.db_manager as db_manager
 
 logger = logging.getLogger(__name__)
 

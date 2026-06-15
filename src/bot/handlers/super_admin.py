@@ -5,7 +5,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 import config
-import db_manager
+import src.database.db_manager as db_manager
 from src.bot.states.bot_states import AdminStates
 from src.bot.handlers.common import send_welcome
 

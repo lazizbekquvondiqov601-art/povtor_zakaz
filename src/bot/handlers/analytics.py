@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import text
 
-import db_manager
+import src.database.db_manager as db_manager
 import data_engine
 import import_file
 from src.bot.init_bot import bot, OBR_CACHE, STAT_CACHE

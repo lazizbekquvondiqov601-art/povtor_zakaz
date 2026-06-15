@@ -10,7 +10,7 @@ from aiogram.filters import Command, BaseFilter
 from aiogram.fsm.context import FSMContext
 
 import config
-import db_manager
+import src.database.db_manager as db_manager
 import auto_zakaz
 import data_engine
 from src.bot.init_bot import bot, OBR_CACHE, STAT_CACHE

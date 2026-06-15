@@ -8,7 +8,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKe
 from aiogram.fsm.context import FSMContext
 
 import config
-import db_manager
+import src.database.db_manager as db_manager
 from src.bot.init_bot import bot, OBR_CACHE, STAT_CACHE
 from src.bot.keyboards.supplier import get_supplier_keyboard
 from src.bot.states.bot_states import Registration

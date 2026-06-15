@@ -1,10 +1,11 @@
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 import io
-from sqlalchemy import text, create_engine, event
+from sqlalchemy import text, create_engine, event, func
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
 import config
-from models import Base, InvitedUser, Supplier, AllowedUser, Admin, Setting, GeneratedOrder, SupplierNameHistory, BlockedUser
+from .models import Base, InvitedUser, Supplier, AllowedUser, Admin, Setting, GeneratedOrder, SupplierNameHistory, BlockedUser
 
 # --- VAQT SOZLAMASI (TASHKENT UTC+5) ---
 TASHKENT_TZ = timezone(timedelta(hours=5))
@@ -56,6 +57,25 @@ def init_db():
         print("✅ Baza to'liq tayyor.")
     except Exception as e:
         print(f"❌ Bazani yaratishda xatolik: {e}")
+
+def is_allowed(telegram_id: int) -> bool:
+    session = Session()
+    try:
+        return session.query(AllowedUser).filter_by(telegram_id=telegram_id).first() is not None
+    finally:
+        session.close()
+
+def toggle_allow_user(telegram_id: int, allow: bool):
+    session = Session()
+    try:
+        user = session.query(AllowedUser).filter_by(telegram_id=telegram_id).first()
+        if allow:
+            if not user: session.add(AllowedUser(telegram_id=telegram_id))
+        else:
+            if user: session.delete(user)
+        session.commit()
+    finally:
+        session.close()
 
 def get_suppliers_with_orders() -> set:
     try:

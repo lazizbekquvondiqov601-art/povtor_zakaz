@@ -3,7 +3,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from src.bot.init_bot import bot, dp, OBR_CACHE, STAT_CACHE
 from src.bot.handlers import setup_handlers
 from src.bot.middlewares.security import SecurityMiddleware
-import db_manager
+import src.database.db_manager as db_manager
 import data_engine
 import config
 import supplier_analytics
@@ -50,6 +50,13 @@ async def main():
     scheduler.start()
 
     print("🤖 Bot yangi modulli arxitektura bilan ishga tushdi...")
+    
+    # Super Adminni xabardor qilish
+    try:
+        await bot.send_message(config.SUPER_ADMIN_ID, "🚀 <b>Bot muvaffaqiyatli ishga tushdi!</b>\n\nBarcha modullar va xavfsizlik tizimi faol holatda. Kod to'liq tayyor.")
+    except Exception as e:
+        print(f"⚠️ Super adminga xabar yuborishda xatolik: {e}")
+
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 

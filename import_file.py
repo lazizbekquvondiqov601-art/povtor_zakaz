@@ -6,7 +6,7 @@ from sqlalchemy import text
 from dotenv import load_dotenv
 
 import config
-import db_manager
+import src.database.db_manager as db_manager
 from src.utils.helpers import classify_imported_product
 
 load_dotenv()
@@ -47,7 +47,7 @@ def init_import_db(engine):
 # ============================================================
 # 2. SINXRONIZATSIYA — KUNMA-KUN SO'ROV
 # ============================================================
-def sync_imports_by_dates(access_token_not_used, engine, start_date_str: str, end_date_str: str):
+def sync_imports_by_dates(access_token, engine, start_date_str: str, end_date_str: str):
     init_import_db(engine)
 
     with engine.begin() as conn:
@@ -56,12 +56,12 @@ def sync_imports_by_dates(access_token_not_used, engine, start_date_str: str, en
             WHERE date(import_date) >= :start AND date(import_date) <= :end
         """), {"start": start_date_str, "end": end_date_str})
 
-    if not BILLZ_BEARER_TOKEN or not BILLZ_PLATFORM_ID:
-        print("❌ .env faylida BILLZ_BEARER_TOKEN yoki BILLZ_PLATFORM_ID topilmadi!")
+    if not access_token or not BILLZ_PLATFORM_ID:
+        print("❌ access_token yoki BILLZ_PLATFORM_ID topilmadi!")
         return "empty", None
 
     headers = {
-        "Authorization": f"Bearer {BILLZ_BEARER_TOKEN}",
+        "Authorization": f"Bearer {access_token}",
         "Cookie": BILLZ_COOKIE or "",
         "platform-id": BILLZ_PLATFORM_ID,
         "accept": "application/json, text/plain, */*",

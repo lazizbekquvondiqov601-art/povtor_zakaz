@@ -3,7 +3,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.fsm.context import FSMContext
 
-import db_manager
+import src.database.db_manager as db_manager
 from src.bot.states.bot_states import Registration
 from src.bot.keyboards.supplier import get_supplier_keyboard
 from src.bot.handlers.common import send_welcome
