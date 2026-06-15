@@ -70,6 +70,13 @@ def process_and_clean_sales_chunk(chunk_of_records):
     existing_columns = [col for col in required_columns if col in df.columns]
     df_clean = df[existing_columns].copy()
 
+    # Bo'sh (blank) qiymatlarni "Boshqa"ga o'tkazish
+    if 'Категория' in df_clean.columns:
+        df_clean['Категория'] = df_clean['Категория'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else (x if isinstance(x, str) else None))
+        df_clean['Категория'] = df_clean['Категория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
+    if 'Подкатегория' in df_clean.columns:
+        df_clean['Подкатегория'] = df_clean['Подкатегория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
+
     if 'Дата' in df_clean.columns:
         df_clean['Дата'] = pd.to_datetime(df_clean['Дата'], errors='coerce')
 
@@ -121,6 +128,12 @@ def process_and_clean_stock_chunk(chunk_of_records, report_date_str):
     ]
     existing_columns = [col for col in required_columns if col in df.columns]
     df_clean = df[existing_columns].copy()
+
+    # Bo'sh (blank) qiymatlarni "Boshqa"ga o'tkazish
+    if 'Категория' in df_clean.columns:
+        df_clean['Категория'] = df_clean['Категория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
+    if 'Подкатегория' in df_clean.columns:
+        df_clean['Подкатегория'] = df_clean['Подкатегория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
 
     if 'product_id' in df_clean.columns and 'Магазин' in df_clean.columns:
         df_clean['ProductShop_Key'] = df_clean['product_id'].astype(str) + '_' + df_clean['Магазин'].astype(str)
@@ -222,7 +235,17 @@ def update_catalog(access_token, engine):
         raw_barcode = str(p.get('barcode', '') or '')
         if raw_barcode.endswith('.0'):
             raw_barcode = raw_barcode[:-2]
-            
+        cat_val = (p.get('categories') or [{}])[0].get('name', '') if p.get('categories') else ''
+        cat_val = str(cat_val).strip()
+        if not cat_val:
+            cat_val = 'Boshqa'
+
+        # Podkategoriya bo'sh bo'lsa "Boshqa" deb belgilash
+        subcat_val = get_field(p.get('custom_fields'), 'Подкатегория')
+        subcat_val = str(subcat_val).strip()
+        if not subcat_val:
+            subcat_val = 'Boshqa'
+   
         rec = {
                     'product_id': str(p.get('id', '')).strip().lower(),
                     'Артикул': p.get('sku', ''), 
@@ -544,6 +567,9 @@ def analyze_and_generate_orders(engine):
         f_sotuvlar['product_id'] = f_sotuvlar['product_id'].astype(str)
         f_qoldiqlar['product_id'] = f_qoldiqlar['product_id'].astype(str)
         f_sotuvlar['sotuv_sanasi'] = pd.to_datetime(f_sotuvlar['Дата'], errors='coerce')
+        d_mahsulotlar['Артикул'] = d_mahsulotlar['Артикул'].astype(str).str.strip()
+        d_mahsulotlar = d_mahsulotlar[~d_mahsulotlar['Артикул'].str.startswith(('010', '011'))]
+
         
         date_col = 'import_date' if 'import_date' in d_mahsulotlar.columns else 'Дата1'
         d_mahsulotlar['import_sana_dt'] = pd.to_datetime(d_mahsulotlar[date_col], errors='coerce', dayfirst=True)
@@ -562,33 +588,38 @@ def analyze_and_generate_orders(engine):
     # ---------------------------------------------------------
     # 🟢 1-BOSQICH: "YASHIL" REJIM (Artikul + Rang + Magazin)
     # ---------------------------------------------------------
+ # ---------------------------------------------------------
+    # 🟢 1-BOSQICH: "YASHIL" REJIM (Podkategoriya + Artikul + Rang + Magazin)
+    # ---------------------------------------------------------
     try:
         pending_orders = pd.read_sql("SELECT * FROM generated_orders WHERE status = 'Topdim'", engine)
         
         if not pending_orders.empty:
-            # Hozirgi qoldiqni olish
-            qoldiq_merged = pd.merge(f_qoldiqlar, d_mahsulotlar[['product_id', 'Артикул', 'Цвет']], on='product_id', how='left')
+            # Hozirgi qoldiqni olish (Endi Podkategoriyani ham qo'shib birlashtiramiz)
+            qoldiq_merged = pd.merge(f_qoldiqlar, d_mahsulotlar[['product_id', 'Артикул', 'Цвет', 'Подкатегория']], on='product_id', how='left')
             qoldiq_merged['Цвет'] = qoldiq_merged['Цвет'].fillna('No Color')
+            qoldiq_merged['Подкатегория'] = qoldiq_merged['Подкатегория'].fillna('Boshqa').astype(str).str.strip()
             
             ids_to_delete = []
             
             for _, order in pending_orders.iterrows():
                 art = str(order['artikul'])
                 shop = str(order['shop'])
+                sub = str(order['subcategory']).strip()  # Podkategoriyani olamiz
                 
                 # Rangni tozalash (Sana qismi bo'lsa olib tashlaymiz)
-                # "Qora (15.01.2024)" -> "Qora"
                 raw_color = str(order['color'])
                 if "(" in raw_color:
                     clean_color = raw_color.split("(")[0].strip()
                 else:
                     clean_color = raw_color.strip()
 
-                # Filtrlash: Artikul + Shop + Rang
+                # Filtrlash: Podkategoriya + Artikul + Shop + Rang bo'yicha moslik
                 curr_stock = qoldiq_merged[
                     (qoldiq_merged['Артикул'] == art) & 
                     (qoldiq_merged['Магазин'] == shop) &
-                    (qoldiq_merged['Цвет'] == clean_color)
+                    (qoldiq_merged['Цвет'] == clean_color) &
+                    (qoldiq_merged['Подкатегория'] == sub)
                 ]['Кол-во'].sum()
                 
                 init_stock = order['initial_stock'] if order['initial_stock'] is not None else 0
@@ -751,11 +782,12 @@ def analyze_and_generate_orders(engine):
     orders_to_insert = []
     
     for _, new_row in orders_db.iterrows():
-        # Match: Artikul + Shop + Color
+        # Match: Podkategoriya + Artikul + Shop + Color
         match = active_orders[
             (active_orders['artikul'] == new_row['artikul']) & 
             (active_orders['shop'] == new_row['shop']) &
-            (active_orders['color'] == new_row['color'])
+            (active_orders['color'] == new_row['color']) &
+            (active_orders['subcategory'].astype(str).str.strip() == str(new_row['subcategory']).strip())
         ]
         
         if not match.empty:
@@ -801,7 +833,7 @@ def run_full_update():
 
     try:
         engine = db_manager.engine
-        
+
         try:
             with engine.begin() as conn:
                 conn.execute(text('ALTER TABLE f_sotuvlar ADD COLUMN "Размер сетка" TEXT'))

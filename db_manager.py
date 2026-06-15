@@ -1,111 +1,15 @@
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-import db_manager
 import io
-import pandas as pd
-from datetime import datetime
-from sqlalchemy import text
-from sqlalchemy import create_engine, Column, Integer, String, BigInteger, Boolean, Float, DateTime, Date, text, func
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text, create_engine, event
+from sqlalchemy.orm import sessionmaker
 import config
+from models import Base, InvitedUser, Supplier, AllowedUser, Admin, Setting, GeneratedOrder, SupplierNameHistory, BlockedUser
 
 # --- VAQT SOZLAMASI (TASHKENT UTC+5) ---
 TASHKENT_TZ = timezone(timedelta(hours=5))
-Base = declarative_base()
-
-# --- JADVAL MODELLARI (POSTGRESQL) ---
-
-class InvitedUser(Base):
-    __tablename__ = 'invited_users'
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(BigInteger, unique=True, nullable=False)
-    is_registered = Column(Boolean, default=False)
-
-class Supplier(Base):
-    __tablename__ = 'suppliers'
-    id = Column(Integer, primary_key=True)
-    # --- O'ZGARISH: unique=True OLIB TASHLANDI ---
-    # Endi bir xil nomda bir nechta odam bo'lishi mumkin
-    name = Column(String, nullable=False) 
-    telegram_id = Column(BigInteger, unique=True, nullable=False)
-# --- VIP (RUXSAT BERILGANLAR) QISMI ---
-
-class AllowedUser(Base):
-    """Tizim yopiq bo'lganda ham kira oladiganlar"""
-    __tablename__ = 'allowed_users'
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(BigInteger, unique=True)
-
-def toggle_allow_user(telegram_id: int, allow: bool):
-    """True = Ruxsat berish, False = Ruxsatni olish"""
-    session = Session()
-    try:
-        user = session.query(AllowedUser).filter_by(telegram_id=telegram_id).first()
-        if allow:
-            if not user: session.add(AllowedUser(telegram_id=telegram_id))
-        else:
-            if user: session.delete(user)
-        session.commit()
-        return True
-    except:
-        session.rollback()
-        return False
-    finally:
-        session.close()
-
-def is_allowed(telegram_id: int) -> bool:
-    session = Session()
-    try:
-        return session.query(AllowedUser).filter_by(telegram_id=telegram_id).first() is not None
-    finally:
-        session.close()
-class Admin(Base):
-    __tablename__ = 'admins'
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(BigInteger, unique=True, nullable=False)
-
-class Setting(Base):
-    __tablename__ = 'settings'
-    id = Column(Integer, primary_key=True)
-    rule_name = Column(String, unique=True, nullable=False)
-    rule_value = Column(Float, nullable=False)
-
-class GeneratedOrder(Base):
-    __tablename__ = 'generated_orders'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    zakaz_id = Column(String, index=True)
-    supplier = Column(String)
-    artikul = Column(String)
-    category = Column(String)
-    subcategory = Column(String)
-    shop = Column(String)
-    color = Column(String)
-    photo = Column(String)
-    supply_price = Column(Float, default=0.0)
-    quantity = Column(Integer)
-    hozirgi_qoldiq = Column(Float)
-    prodano = Column(Float)
-    days_passed = Column(Integer)
-    ortacha_sotuv = Column(Float)
-    kutilyotgan_sotuv = Column(Float)
-    tovar_holati = Column(String)
-    import_date = Column(Date)
-    created_at = Column(Date, server_default=func.current_date())
-    status = Column(String, default='Kutilmoqda')
-    initial_stock = Column(Float) 
-
-class SupplierNameHistory(Base):
-    __tablename__ = 'supplier_name_history'
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(BigInteger, nullable=False, index=True)
-    old_name = Column(String, nullable=False)
-    new_name = Column(String, nullable=False)
-    change_date = Column(DateTime(timezone=True), server_default=func.now())
 
 # --- DB SESSIYASI ---
-from sqlalchemy import event
 engine = create_engine(config.POSTGRES_URL, connect_args={"check_same_thread": False})
 
 @event.listens_for(engine, "connect")
@@ -547,12 +451,6 @@ def get_import_orders_detailed(min_day, max_day, category, subcategory):
         return pd.DataFrame()
 # --- YANGI QISM: BLOKLASH VA GLOBAL QULF ---
 
-# Yangi jadval: Bloklanganlar
-class BlockedUser(Base):
-    __tablename__ = 'blocked_users'
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(BigInteger, unique=True)
-
 # 1. Botni yopish/ochish (Sozlamalar jadvaliga yozamiz)
 def set_global_lock(is_locked: bool):
     """True = Yopish, False = Ochish"""
@@ -703,13 +601,13 @@ def get_stock_subcategories_summary_v2(category: str, target_date: str) -> tuple
             ORDER BY total_qty DESC
         ''')
         
-        # AKSIYA tovarlar: faqat 010 bilan boshlanganlar
+        # AKSIYA tovarlar: faqat 010 va 011 bilan boshlanganlar
         query_aksiya = text('''
             SELECT "Подкатегория", "Пол", SUM("Кол-во") as total_qty
             FROM f_qoldiqlar
             WHERE "Категория" = :category
-            AND date("Дата") = :target_date
-            AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
+              AND date("Дата") = :target_date
+              AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
             GROUP BY "Подкатегория", "Пол"
             ORDER BY total_qty DESC
         ''')
@@ -717,8 +615,24 @@ def get_stock_subcategories_summary_v2(category: str, target_date: str) -> tuple
         res_asosiy = session.execute(query_asosiy, {"category": category, "target_date": target_date}).fetchall()
         res_aksiya = session.execute(query_aksiya, {"category": category, "target_date": target_date}).fetchall()
         
-        list_asosiy = [(r[0] or "Noma'lum", r[1] or "Универсал", float(r[2] or 0)) for r in res_asosiy]
-        list_aksiya = [(r[0] or "Noma'lum", r[1] or "Универсал", float(r[2] or 0)) for r in res_aksiya]
+        # Python orqali bo'sh maydonlarni tozalash va dublikatlarni birlashtirish (SQL xatolaridan himoyalaydi)
+        def process_rows(rows):
+            merged = {}
+            for r in rows:
+                sub = str(r[0] or "").strip()
+                if not sub:
+                    sub = "Boshqa"
+                gender = str(r[1] or "Универсал").strip()
+                qty = float(r[2] or 0)
+                
+                key = (sub, gender)
+                merged[key] = merged.get(key, 0.0) + qty
+                
+            sorted_list = [(k[0], k[1], v) for k, v in merged.items()]
+            return sorted(sorted_list, key=lambda x: x[2], reverse=True)
+
+        list_asosiy = process_rows(res_asosiy)
+        list_aksiya = process_rows(res_aksiya)
         
         return list_asosiy, list_aksiya
     except Exception as e:
@@ -731,37 +645,51 @@ def get_all_stock_summary_for_excel(target_date: str) -> tuple[pd.DataFrame, pd.
     """Tanlangan sana bo'yicha barcha qoldiqlarni Excel uchun tayyorlaydi"""
     session = Session()
     try:
-        query_asosiy = text('''
+        query_asosiy_raw = text('''
             SELECT 
-                COALESCE("Подкатегория", 'Noma''lum') as "Подкатегория",
-                COALESCE("Категория", 'Noma''lum') as "Категория",
-                COALESCE("Пол", 'Универсал') as "Пол",
-                SUM("Кол-во") as "Қолдиқ (дона)"
-            FROM f_qoldiqlar
-            WHERE date("Дата") = :target_date AND "Артикул" NOT LIKE '010%'
-            GROUP BY "Подкатегория", "Категория", "Пол"
-            ORDER BY "Подкатегория" ASC, "Категория" ASC, "Пол" ASC
-        ''')
-        
-        query_aksiya = text('''
-            SELECT 
-                COALESCE("Подкатегория", 'Noma''lum') as "Подкатегория",
-                COALESCE("Категория", 'Noma''lum') as "Категория",
-                COALESCE("Пол", 'Универсал') as "Пол",
-                SUM("Кол-во") as "Қолдиқ (дона)"
+                "Подкатегория",
+                "Категория",
+                "Пол",
+                "Кол-во"
             FROM f_qoldiqlar
             WHERE date("Дата") = :target_date 
-            AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
-            GROUP BY "Подкатегория", "Категория", "Пол"
-            ORDER BY "Подкатегория" ASC, "Категория" ASC, "Пол" ASC
+              AND "Артикул" NOT LIKE '010%'
+              AND "Артикул" NOT LIKE '011%'
         ''')
         
-        df_asosiy = pd.read_sql(query_asosiy, engine, params={"target_date": target_date})
-        df_aksiya = pd.read_sql(query_aksiya, engine, params={"target_date": target_date})
+        query_aksiya_raw = text('''
+            SELECT 
+                "Подкатегория",
+                "Категория",
+                "Пол",
+                "Кол-во"
+            FROM f_qoldiqlar
+            WHERE date("Дата") = :target_date 
+              AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
+        ''')
+        
+        df_raw_asosiy = pd.read_sql(query_asosiy_raw, engine, params={"target_date": target_date})
+        df_raw_aksiya = pd.read_sql(query_aksiya_raw, engine, params={"target_date": target_date})
+        
+        # Pandas yordamida tozalash va guruhlash (SQL xatoliklarining oldini oladi)
+        def clean_and_aggregate(df):
+            if df.empty:
+                return pd.DataFrame(columns=["Подкатегория", "Категория", "Пол", "Қолдиқ (дона)"])
+            
+            df['Подкатегория'] = df['Подкатегория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
+            df['Категория'] = df['Категория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
+            df['Пол'] = df['Пол'].fillna('Универсал').astype(str).str.strip().replace('', 'Универсал')
+            
+            agg_df = df.groupby(['Подкатегория', 'Категория', 'Пол'], as_index=False)['Кол-во'].sum()
+            agg_df.rename(columns={'Кол-во': 'Қолдиқ (дона)'}, inplace=True)
+            return agg_df.sort_values(by=["Подкатегория", "Категория", "Пол"])
+
+        df_asosiy = clean_and_aggregate(df_raw_asosiy)
+        df_aksiya = clean_and_aggregate(df_raw_aksiya)
         
         return df_asosiy, df_aksiya, target_date
     except Exception as e:
-        print(f"Excel hisobot olishda xato: {e}")
+        print(f"Excel hisobot hisoblashda xato: {e}")
         return pd.DataFrame(), pd.DataFrame(), target_date
     finally:
         session.close()
