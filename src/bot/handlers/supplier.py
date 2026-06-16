@@ -142,19 +142,58 @@ def build_caption_helper(article, group, first, color_type, pending_df=None):
 async def feedback_handler(callback: CallbackQuery):
     _, status, artikul = callback.data.split(":")
     logger.info(f"Supplier {callback.from_user.id} gave feedback {status} for {artikul}")
-    
+
     if status == 'Topdim':
         if db_manager.update_order_status(artikul, 'Topdim'):
-            new_text = f"✅ <b>{artikul}</b> qabul qilindi."
+            new_text = f"✅ <b>{artikul}</b> qabul qilindi va 'Kutilmoqda' ro'yxatiga o'tkazildi."
             try:
-                if callback.message.photo: await callback.message.edit_caption(caption=new_text, reply_markup=None)
-                else: await callback.message.edit_text(new_text, reply_markup=None)
+                if callback.message.photo: 
+                    await callback.message.edit_caption(caption=new_text, reply_markup=None)
+                else: 
+                    await callback.message.edit_text(new_text, reply_markup=None)
             except Exception as e:
                 logger.error(f"Error updating feedback message: {e}")
-            
-            # Kanalga hisobot yuborish logikasi (bot.py dan)
-            # ... (bu qismni keyinroq optimallashtiramiz)
-            pass
+
+            # Kanalga hisobot yuborish logikasi
+            try:
+                details_df = db_manager.get_confirmed_order_details(artikul)
+                if not details_df.empty:
+                    first_row = details_df.iloc[0]
+                    supplier_name = first_row['supplier']
+                    photo_url = str(first_row['photo'])
+                    price = first_row.get('supply_price', 0)
+                    try:
+                        price_str = f"{float(price):,.0f}".replace(",", " ")
+                    except:
+                        price_str = "0"
+
+                    total_qty = details_df['quantity'].sum()
+
+                    report = f"✅ <b>YUK KELYAPTI! (Tasdiqlandi)</b>\n\n"
+                    report += f"📦 Artikul: <b>{artikul}</b>\n"
+                    report += f"💵 Tan Narx: <b>{price_str} so'm</b>\n"
+                    report += f"🚛 Yetkazuvchi: <b>{supplier_name}</b>\n"
+                    report += f"👤 Tasdiqladi: <b>{callback.from_user.full_name}</b>\n"
+                    report += f"🔢 Jami miqdor: <b>{int(total_qty)} pochka</b>\n"
+                    report += "━━━━━━━━━━━━━━\n"
+                    report += "📋 <b>TARQATISH RO'YXATI:</b>\n"
+
+                    for shop, group in details_df.groupby('shop'):
+                        report += f"\n🏪 <b>{shop}:</b>"
+                        for _, row in group.iterrows():
+                            color_info = row['color']
+                            qty_info = int(row['quantity'])
+                            report += f"\n   — {color_info}: <b>{qty_info} pochka</b>"
+
+                    report += "\n━━━━━━━━━━━━━━\n⚠️ <i>Skladchi diqqatiga: Yuk kelganda shu ro'yxat bo'yicha qabul tarqating!</i>"
+
+                    if hasattr(config, 'ARCHIVE_CHANNEL_ID') and config.ARCHIVE_CHANNEL_ID:
+                        if photo_url and photo_url.startswith('http'):
+                            await bot.send_photo(chat_id=config.ARCHIVE_CHANNEL_ID, photo=photo_url, caption=report)  
+                        else:
+                            await bot.send_message(chat_id=config.ARCHIVE_CHANNEL_ID, text=report)
+            except Exception as e:
+                logger.error(f"Kanalga yuborishda xato: {e}")
     else:
         await callback.message.delete()
         await callback.answer("❌ Tushunarli, topilmadi.", show_alert=True)
