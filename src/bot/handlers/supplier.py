@@ -145,8 +145,9 @@ async def feedback_handler(callback: CallbackQuery):
 
     if status == 'Topdim':
         if db_manager.update_order_status(artikul, 'Topdim'):
-            new_text = f"✅ <b>{artikul}</b> qabul qilindi va 'Kutilmoqda' ro'yxatiga o'tkazildi."
             try:
+                old_text = callback.message.html_text or ""
+                new_text = f"✅ <b>QABUL QILINDI VA YO'LDA</b>\n\n{old_text}"
                 if callback.message.photo: 
                     await callback.message.edit_caption(caption=new_text, reply_markup=None)
                 else: 

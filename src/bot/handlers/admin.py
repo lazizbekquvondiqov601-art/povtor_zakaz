@@ -114,10 +114,10 @@ async def obr_category_click(callback: CallbackQuery):
         if not s: continue
         sub_id = str(uuid.uuid4())[:8]
         OBR_CACHE[f"sub_{sub_id}"] = s
-        kb.append([InlineKeyboardButton(text=f"🔹 {s}", callback_data=f"obrSub_{session_id}_{sub_id}")])
-    
-    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_back_root")]) # Reusing root back if applicable or similar
-    
+        kb.append([InlineKeyboardButton(text=f"🔹 {s}", callback_data=f"obrSub_{session_id}_{cat_id}_{sub_id}")])
+
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_back_root")]) 
+
     await callback.message.edit_text(
         f"📂 <b>{category}</b>\n\nIchki turlarni (podkategoriya) tanlang:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
@@ -125,13 +125,11 @@ async def obr_category_click(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("obrSub_"))
 async def obr_subcategory_click(callback: CallbackQuery):
-    # Oldin faqat rasm jo'natar edi, endi segment tugmalari (Zakaz kerak, Kuzatuvda...) bilan chiqishi kerak
-    # callback format is obrSub_{session_id}_{sub_id} in current logic, let's keep it consistent or use obrSub_{session_id}_{cat_id}_{sub_id} like legacy?
-    # Wait, in current admin.py it's: f"obrSub_{session_id}_{sub_id}"
     parts = callback.data.split("_")
     session_id = parts[1]
-    sub_id = parts[2]
-    
+    cat_id = parts[2]
+    sub_id = parts[3]
+
     df = OBR_CACHE.get(session_id)
     sub_name = OBR_CACHE.get(f"sub_{sub_id}")
 
@@ -140,7 +138,7 @@ async def obr_subcategory_click(callback: CallbackQuery):
         return
 
     await callback.answer(f"📊 {sub_name} tahlili...")
-    
+
     img_buf = await asyncio.to_thread(generate_macro_image, df, sub_name)
 
     sub_df = df[df['Подкатегория'] == sub_name]
@@ -153,10 +151,10 @@ async def obr_subcategory_click(callback: CallbackQuery):
         OBR_CACHE[f"seg_{seg_id}"] = seg
         kb.append([InlineKeyboardButton(
             text=f"🔹 {seg.split('(')[0].strip()}",
-            callback_data=f"obrSegMenu_{session_id}_{sub_id}_{seg_id}"
+            callback_data=f"obrSegMenu_{session_id}_{cat_id}_{sub_id}_{seg_id}"
         )])
 
-    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_back_root")])
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"obrCat_{session_id}_{cat_id}")])
 
     if img_buf:
         try:
@@ -179,7 +177,7 @@ async def obr_subcategory_click(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("obrSegMenu_"))
 async def obr_seg_menu_click(callback: CallbackQuery):
     parts = callback.data.split("_")
-    _, session_id, sub_id, seg_id = parts
+    _, session_id, cat_id, sub_id, seg_id = parts
     seg_name = OBR_CACHE.get(f"seg_{seg_id}")
     sub_name = OBR_CACHE.get(f"sub_{sub_id}")
 
@@ -188,14 +186,14 @@ async def obr_seg_menu_click(callback: CallbackQuery):
         return
 
     kb = [
-        [InlineKeyboardButton(text="🛒 ZAKAZ KERAK", callback_data=f"obrSegDet_{session_id}_{sub_id}_{seg_id}_zakaz")],
-        [InlineKeyboardButton(text="👁 KUZATUVDA", callback_data=f"obrSegDet_{session_id}_{sub_id}_{seg_id}_kuzat")],
-        [InlineKeyboardButton(text="📋 HAMMASI", callback_data=f"obrSegDet_{session_id}_{sub_id}_{seg_id}_all")],
-        [InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"obrSub_{session_id}_{sub_id}")],
+        [InlineKeyboardButton(text="🛒 ZAKAZ KERAK", callback_data=f"obrSegDet_{session_id}_{cat_id}_{sub_id}_{seg_id}_zakaz")],
+        [InlineKeyboardButton(text="👁 KUZATUVDA", callback_data=f"obrSegDet_{session_id}_{cat_id}_{sub_id}_{seg_id}_kuzat")],
+        [InlineKeyboardButton(text="📋 HAMMASI", callback_data=f"obrSegDet_{session_id}_{cat_id}_{sub_id}_{seg_id}_all")],
+        [InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"obrSub_{session_id}_{cat_id}_{sub_id}")],
     ]
 
     text = f"📦 <b>{sub_name}</b>\n🔹 <b>{seg_name}</b>\n\nQaysi bo'limni ko'rmoqchisiz?"
-    
+
     try:
         if callback.message.photo:
             await callback.message.delete()
@@ -208,7 +206,7 @@ async def obr_seg_menu_click(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("obrSegDet_"))
 async def obr_seg_detail_click(callback: CallbackQuery):
     parts = callback.data.split("_")
-    _, session_id, sub_id, seg_id, mode = parts 
+    _, session_id, cat_id, sub_id, seg_id, mode = parts 
     df       = OBR_CACHE.get(session_id)
     sub_name = OBR_CACHE.get(f"sub_{sub_id}")
     seg_name = OBR_CACHE.get(f"seg_{seg_id}")
