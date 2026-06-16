@@ -50,9 +50,24 @@ def init_db():
         # --- JINS (ПОЛ) USTUNINI QOLDIQ JADVALIGA QO'SHISH ---
         try:
             with engine.begin() as conn:
-                conn.execute(text('ALTER TABLE f_qoldiqlar ADD COLUMN "Пол" TEXT'))
+                # Railway (Cloud) uchun jadvallarni oldindan tayyorlab qo'yamiz (Xatolikni oldini olish uchun)
+                conn.execute(text('''
+                    CREATE TABLE IF NOT EXISTS f_sotuvlar (
+                        "product_id" TEXT, "Артикул" TEXT, "Наименование" TEXT, "Магазин" TEXT, "Дата" DATETIME,
+                        "Продано za vychetom vozvratov" BIGINT, "Продано за вычетом возвратов" BIGINT
+                    )
+                '''))
+                conn.execute(text('''
+                    CREATE TABLE IF NOT EXISTS f_qoldiqlar (
+                        "product_id" TEXT, "Магазин" TEXT, "Кол-wo" REAL, "Кол-во" REAL, "Дата" DATETIME, "Пол" TEXT
+                    )
+                '''))
+                
+                # Agar jadval bor bo'lsa, ustunni tekshirib qo'shamiz
+                try: conn.execute(text('ALTER TABLE f_qoldiqlar ADD COLUMN "Пол" TEXT'))
+                except: pass
         except Exception:
-            pass # Agar allaqachon bor bo'lsa indamaydi
+            pass 
             
         print("✅ Baza to'liq tayyor.")
     except Exception as e:

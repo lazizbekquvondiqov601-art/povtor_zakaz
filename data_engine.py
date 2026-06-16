@@ -329,7 +329,11 @@ def update_sales(access_token, engine):
             daily_df = pd.concat(day_chunks, ignore_index=True)
             try:
                 with engine.begin() as conn:
-                    conn.execute(text(f'''DELETE FROM f_sotuvlar WHERE "Дата" >= '{day_str} 00:00:00' AND "Дата" <= '{day_str} 23:59:59' '''))
+                    # FIX: Handle non-existent table gracefully
+                    try:
+                        conn.execute(text(f'''DELETE FROM f_sotuvlar WHERE "Дата" >= '{day_str} 00:00:00' AND "Дата" <= '{day_str} 23:59:59' '''))
+                    except Exception:
+                        pass
                     daily_df.to_sql("f_sotuvlar", conn, if_exists="append", index=False)
                 print(f"✅ {day_str} muvaffaqiyatli yangilandi. ({len(daily_df)} qator)")
             except Exception as e:
