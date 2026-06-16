@@ -96,6 +96,57 @@ async def auto_zakaz_click(message: Message):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
+@router.callback_query(F.data.startswith("obrCat_"))
+async def obr_category_click(callback: CallbackQuery):
+    _, session_id, cat_id = callback.data.split("_")
+    df = OBR_CACHE.get(session_id)
+    category = OBR_CACHE.get(f"cat_{cat_id}")
+
+    if df is None or category is None:
+        await callback.answer("⏳ Ma'lumot eskirgan, qaytadan hisoblang.", show_alert=True)
+        return
+
+    cat_df = df[df['Категория'] == category]
+    subs = sorted(cat_df['Подкатегория'].unique().tolist())
+
+    kb = []
+    for s in subs:
+        if not s: continue
+        sub_id = str(uuid.uuid4())[:8]
+        OBR_CACHE[f"sub_{sub_id}"] = s
+        kb.append([InlineKeyboardButton(text=f"🔹 {s}", callback_data=f"obrSub_{session_id}_{sub_id}")])
+    
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_back_root")]) # Reusing root back if applicable or similar
+    
+    await callback.message.edit_text(
+        f"📂 <b>{category}</b>\n\nIchki turlarni (podkategoriya) tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data.startswith("obrSub_"))
+async def obr_subcategory_click(callback: CallbackQuery):
+    _, session_id, sub_id = callback.data.split("_")
+    df = OBR_CACHE.get(session_id)
+    sub_name = OBR_CACHE.get(f"sub_{sub_id}")
+
+    if df is None or sub_name is None:
+        await callback.answer("⏳ Eskirgan.", show_alert=True)
+        return
+
+    await callback.answer(f"📊 {sub_name} tahlili...")
+    chart_buf = await asyncio.to_thread(generate_macro_image, df, sub_name)
+
+    if chart_buf:
+        photo = BufferedInputFile(chart_buf.getvalue(), filename="obr.png")
+        await bot.send_photo(
+            chat_id=callback.message.chat.id,
+            photo=photo,
+            caption=f"📊 <b>OBR TAHLIL: {sub_name}</b>",
+            reply_markup=get_close_keyboard()
+        )
+    else:
+        await callback.message.answer(f"❌ {sub_name} uchun grafik yaratishda xatolik.")
+
 # --- MAJBURIY YANGILASH ---
 
 @router.message(IsAdmin(), F.text == "🔄 Majburiy Yangilash")
@@ -189,3 +240,27 @@ async def show_stock_dates(message: Message):
         f"Hisobotni ko'rish uchun oxirgi 7 kunlikdan sanani tanlang:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
+
+@router.callback_query(F.data.startswith("stqDate_"))
+async def stock_date_selected(callback: CallbackQuery):
+    date_str = callback.data.split("_")[1]
+    await callback.answer(f"⏳ {date_str} qoldiqlari...")
+    
+    asosiy, aksiya = await asyncio.to_thread(db_manager.get_stock_report_by_date, date_str)
+    
+    if not asosiy and not aksiya:
+        await callback.message.answer(f"⚠️ {date_str} uchun qoldiq ma'lumotlari topilmadi.")
+        return
+        
+    chart_buf = await asyncio.to_thread(generate_sales_table_image, asosiy, aksiya, {}, {}, f"QOLDIQ: {date_str}")
+    
+    if chart_buf:
+        photo = BufferedInputFile(chart_buf.getvalue(), filename="stock.png")
+        await bot.send_photo(
+            chat_id=callback.message.chat.id,
+            photo=photo,
+            caption=f"📦 <b>QOLDIQLAR: {date_str}</b>",
+            reply_markup=get_close_keyboard()
+        )
+    else:
+        await callback.message.answer("❌ Grafik yaratishda xatolik.")

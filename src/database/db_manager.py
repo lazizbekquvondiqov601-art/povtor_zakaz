@@ -529,6 +529,44 @@ def get_confirmed_order_details(artikul: str):
 
 # --- ENG OXIRGI SANADAGI QOLDIQLARNI HISOB-KITOB QILISH ---
 
+def get_stock_report_by_date(target_date: str) -> tuple[dict, dict]:
+    """Tanlangan sanadagi qoldiqlarni kategoriya bo'yicha qaytaradi."""
+    session = Session()
+    try:
+        params = {"target_date": target_date}
+        query_asosiy = text('''
+            SELECT 
+                COALESCE(NULLIF(TRIM("Категория"), ''), 'Boshqa tovarlar') as kat,
+                SUM("Кол-во") as total_qty
+            FROM f_qoldiqlar
+            WHERE date("Дата") = :target_date
+              AND "Артикул" NOT LIKE '010%'
+              AND "Артикул" NOT LIKE '011%'
+            GROUP BY kat
+        ''')
+        query_aksiya = text('''
+            SELECT 
+                COALESCE(NULLIF(TRIM("Категория"), ''), 'Boshqa tovarlar') as kat,
+                SUM("Кол-во") as total_qty
+            FROM f_qoldiqlar
+            WHERE date("Дата") = :target_date
+              AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
+            GROUP BY kat
+        ''')
+        
+        asosiy_rows = session.execute(query_asosiy, params).fetchall()
+        aksiya_rows = session.execute(query_aksiya, params).fetchall()
+        
+        asosiy = {kat: {"qty": float(qty or 0), "profit": 0} for kat, qty in asosiy_rows}
+        aksiya = {kat: {"qty": float(qty or 0), "profit": 0} for kat, qty in aksiya_rows}
+        
+        return asosiy, aksiya
+    except Exception as e:
+        print(f"❌ Qoldiq hisobotida xatolik: {e}")
+        return {}, {}
+    finally:
+        session.close()
+
 def get_max_stock_date_str() -> str:
     """f_qoldiqlar jadvalidagi eng oxirgi sanani aniqlaydi"""
     session = Session()

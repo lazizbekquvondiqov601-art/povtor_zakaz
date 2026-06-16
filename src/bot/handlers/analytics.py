@@ -77,6 +77,18 @@ async def stat_back_root(callback: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
+@router.callback_query(F.data == "stat_back")
+async def stat_back_to_main(callback: CallbackQuery):
+    kb = [
+        [InlineKeyboardButton(text="📦 Zakaz statistikasi", callback_data="stat_zakaz")],
+        [InlineKeyboardButton(text="📊 Sotuv tahlili", callback_data="stat_sotuv")],
+        [InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")]
+    ]
+    await callback.message.edit_text(
+        "📈 <b>STATISTIKA</b>\nQaysi bo'limni ko'rmoqchisiz?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
 # --- SALES ANALYSIS ---
 
 @router.callback_query(F.data == "stat_sotuv")
@@ -196,4 +208,16 @@ async def import_analysis_start(message: types.Message):
     kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
     await message.answer("📅 <b>IMPORT TAHLILI</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
-# ... (Additional import and stock handlers follow the same pattern)
+@router.callback_query(F.data.startswith("impMix_"))
+async def import_mix_click(callback: CallbackQuery):
+    cat_label = callback.data.split("_")[1]
+    await callback.answer(f"⏳ {cat_label} tahlili...")
+    # Tahlil mantiqi (hozircha rasm yoki matn)
+    await callback.message.answer(f"📊 {cat_label} bo'yicha import tahlili yaqin orada qo'shiladi (mantiqiy hisob-kitoblar talab etiladi).")
+
+@router.callback_query(F.data.startswith("impRange_"))
+async def import_range_click(callback: CallbackQuery):
+    d_range = callback.data.split("_")[1]
+    await callback.answer(f"⏳ {d_range} kunlik import tahlili...")
+    # Tahlil mantiqi
+    await callback.message.answer(f"📊 {d_range} kunlik import tahlili yaqin orada qo'shiladi.")
