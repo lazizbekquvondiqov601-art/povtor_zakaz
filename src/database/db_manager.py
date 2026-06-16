@@ -567,6 +567,149 @@ def get_stock_report_by_date(target_date: str) -> tuple[dict, dict]:
     finally:
         session.close()
 
+def get_stats_by_import_days(min_day, max_day, category=None):
+    """
+    Kun oralig'i bo'yicha GLOBAL qidiruv.
+    """
+    session = Session()
+    try:
+        query = session.query(GeneratedOrder).filter(
+            GeneratedOrder.status == 'Kutilmoqda',
+            GeneratedOrder.days_passed >= min_day,
+            GeneratedOrder.days_passed <= max_day
+        )
+
+        if category is None:
+            results = query.with_entities(GeneratedOrder.category).distinct().all()
+        else:
+            results = query.filter(GeneratedOrder.category == category).with_entities(GeneratedOrder.subcategory).distinct().all()
+
+        return sorted([r[0] for r in results if r[0]])
+    finally:
+        session.close()
+
+def get_stock_categories_on_date(target_date: str) -> list[str]:
+    """Tanlangan sanadagi barcha unikal Kategoriyalarni qaytaradi"""
+    session = Session()
+    try:
+        query = text('''
+            SELECT DISTINCT "Категория"
+            FROM f_qoldiqlar        
+            WHERE date("Дата") = :target_date
+        ''')
+        results = session.execute(query, {"target_date": target_date}).fetchall()
+        return sorted([r[0] for r in results if r[0]])
+    except Exception as e:
+        print(f"Kategoriyalarni olishda xato: {e}")
+        return []
+    finally:
+        session.close()
+
+def get_stock_subcategories_summary_v2(category: str, target_date: str) -> tuple[list[tuple[str, str, float]], list[tuple[str, str, float]]]:        
+    """Tanlangan sana va kategoriya bo'yicha qoldiqlarni jinsi bilan birga qaytaradi"""
+    session = Session()
+    try:
+        query_asosiy = text('''     
+            SELECT "Подкатегория",  "Пол", SUM("Кол-во") as total_qty
+            FROM f_qoldiqlar        
+            WHERE "Категория" = :category
+              AND date("Дата") = :target_date
+              AND "Артикул" NOT LIKE '010%'
+              AND "Артикул" NOT LIKE '011%'
+            GROUP BY "Подкатегория", "Пол"
+            ORDER BY total_qty DESC 
+        ''')
+
+        query_aksiya = text('''     
+            SELECT "Подкатегория",  "Пол", SUM("Кол-во") as total_qty
+            FROM f_qoldiqlar        
+            WHERE "Категория" = :category
+              AND date("Дата") = :target_date
+              AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
+            GROUP BY "Подкатегория", "Пол"
+            ORDER BY total_qty DESC 
+        ''')
+
+        res_asosiy = session.execute(query_asosiy, {"category": category, "target_date": target_date}).fetchall()
+        res_aksiya = session.execute(query_aksiya, {"category": category, "target_date": target_date}).fetchall()
+
+        def process_rows(rows):     
+            merged = {}
+            for r in rows:
+                sub = str(r[0] or "").strip()
+                if not sub:
+                    sub = "Boshqa"  
+                gender = str(r[1] or "Универсал").strip()
+                qty = float(r[2] or 0)
+
+                key = (sub, gender) 
+                merged[key] = merged.get(key, 0.0) + qty
+
+            sorted_list = [(k[0], k[1], v) for k, v in merged.items()]
+            return sorted(sorted_list, key=lambda x: x[2], reverse=True)
+
+        list_asosiy = process_rows(res_asosiy)
+        list_aksiya = process_rows(res_aksiya)
+
+        return list_asosiy, list_aksiya
+    except Exception as e:
+        print(f"Qoldiq tahlili hisoblashda xato: {e}")
+        return [], []
+    finally:
+        session.close()
+
+def get_all_stock_summary_for_excel(target_date: str) -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    """Tanlangan sana bo'yicha barcha qoldiqlarni Excel uchun tayyorlaydi"""
+    session = Session()
+    try:
+        query_asosiy_raw = text(''' 
+            SELECT
+                "Подкатегория",     
+                "Категория",        
+                "Пол",
+                "Кол-во"
+            FROM f_qoldiqlar        
+            WHERE date("Дата") = :target_date
+              AND "Артикул" NOT LIKE '010%'
+              AND "Артикул" NOT LIKE '011%'
+        ''')
+
+        query_aksiya_raw = text(''' 
+            SELECT
+                "Подкатегория",     
+                "Категория",        
+                "Пол",
+                "Кол-во"
+            FROM f_qoldiqlar        
+            WHERE date("Дата") = :target_date
+              AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
+        ''')
+
+        df_raw_asosiy = pd.read_sql(query_asosiy_raw, engine, params={"target_date": target_date})
+        df_raw_aksiya = pd.read_sql(query_aksiya_raw, engine, params={"target_date": target_date})
+
+        def clean_and_aggregate(df):
+            if df.empty:
+                return pd.DataFrame(columns=["Подкатегория", "Категория", "Пол", "Қолдиқ (дона)"])
+
+            df['Подкатегория'] = df['Подкатегория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
+            df['Категория'] = df['Категория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
+            df['Пол'] = df['Пол'].fillna('Универсал').astype(str).str.strip().replace('', 'Универсал')
+
+            agg_df = df.groupby(['Подкатегория', 'Категория', 'Пол'], as_index=False)['Кол-во'].sum()
+            agg_df.rename(columns={'Кол-во': 'Қолдиқ (дона)'}, inplace=True)
+            return agg_df.sort_values(by=["Подкатегория", "Категория", "Пол"])
+
+        df_asosiy = clean_and_aggregate(df_raw_asosiy)
+        df_aksiya = clean_and_aggregate(df_raw_aksiya)
+
+        return df_asosiy, df_aksiya, target_date
+    except Exception as e:
+        print(f"Excel hisobot hisoblashda xato: {e}")
+        return pd.DataFrame(), pd.DataFrame(), target_date
+    finally:
+        session.close()
+
 def get_max_stock_date_str() -> str:
     """f_qoldiqlar jadvalidagi eng oxirgi sanani aniqlaydi"""
     session = Session()

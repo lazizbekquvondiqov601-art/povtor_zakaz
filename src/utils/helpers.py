@@ -160,25 +160,42 @@ def classify_imported_product(subcategory: str, retail_price: float) -> str:
 
     return "Boshqa tovarlar"
 
+def is_dona_category(category_name: str) -> bool:
+    """Kategoriya dona hisobida (pochka emas) zakaz qilinishini tekshiradi."""
+    dona_cats = {'Аксессуары', 'Головной убор', 'Игрушка', 'Нижнее белье'}
+    return str(category_name).strip() in dona_cats
+
 def format_money(val: float) -> str:
     """Pullarni o'zbek formatida chiqaradi."""
     return f"{int(val):,}".replace(",", " ")
 
-def build_caption(row: pd.Series, unit: str = "pochka") -> str:
-    """Zakaz xabari uchun caption yaratadi."""
-    caption = (
-        f"👤 <b>Yetkazib beruvchi:</b> {row.get('supplier', '-')}\n"
-        f"📦 <b>Artikul:</b> {row.get('artikul', '-')}\n"
-        f"📂 <b>Kategoriya:</b> {row.get('category', '-')}\n"
-        f"🔹 <b>Podkategoriya:</b> {row.get('subcategory', '-')}\n"
-        f"🏪 <b>Do'kon:</b> {row.get('shop', '-')}\n"
-        f"🎨 <b>Rang:</b> {row.get('color', '-')}\n"
-        f"💰 <b>Narxi:</b> {format_money(row.get('supply_price', 0))} UZS\n"
-        f"🔢 <b>Zakaz miqdori:</b> <b>{int(row.get('quantity', 0))} {unit}</b>\n\n"
-        f"📉 <b>Tahlil:</b>\n"
-        f"  - Qoldiq: {row.get('hozirgi_qoldiq', 0)}\n"
-        f"  - Sotuv: {row.get('prodano', 0)}\n"
-        f"  - Kun o'tdi: {row.get('days_passed', 0)}\n"
-        f"  - OBR: {row.get('OBR %', '0%')}"
-    )
+def build_caption(article, group, first, color_type, pending_df=None):
+    DONA_CATS = {'Аксессуары', 'Головной убор', 'Игрушка', 'Нижнее белье'}
+    icon   = {'white': '📦', 'yellow': '🟡', 'red': '🔴'}.get(color_type, '📦')
+    subcat = str(first.get('subcategory', '-')).strip()
+    unit   = 'dona' if str(first.get('category', '')).strip() in DONA_CATS else 'pochka'
+
+    warning = ''
+    if color_type == 'white' and pending_df is not None and not pending_df.empty:       
+        match = pending_df[pending_df['artikul'] == article]
+        if not match.empty:
+            warning = f"\n⚠️ <b>Eslatma:</b> {int(match['quantity'].sum())} ta yo'lda."
+
+    caption = f"{icon} <b>{article}</b>\n<i>{subcat}</i>{warning}\n"
+
+    if color_type == 'white':
+        price = first.get('supply_price', 0)
+        try:    price_str = f"{float(price):,.0f}".replace(',', ' ')
+        except: price_str = '0'
+        caption += f"👤 {first.get('supplier', '-')}\n💵 {price_str} so'm\n"
+    elif color_type in ('yellow', 'red'):
+        caption += f"({first.get('supplier', 'Noma\u02bclum')})\n"
+
+    for shop, s_group in group.groupby('shop'):
+        caption += f"\n🏪 <b>{shop}:</b>"
+        for _, row in s_group.iterrows():
+            qoldiq = int(float(row.get('hozirgi_qoldiq', 0) or 0))
+            sotuv  = int(float(row.get('prodano', 0) or 0))
+            caption += f"\n  - {row.get('color','-')}: <b>{int(row.get('quantity',0))} {unit}</b> (Q:{qoldiq}) (S:{sotuv})"
+
     return caption

@@ -210,14 +210,258 @@ async def import_analysis_start(message: types.Message):
 
 @router.callback_query(F.data.startswith("impMix_"))
 async def import_mix_click(callback: CallbackQuery):
-    cat_label = callback.data.split("_")[1]
-    await callback.answer(f"⏳ {cat_label} tahlili...")
-    # Tahlil mantiqi (hozircha rasm yoki matn)
-    await callback.message.answer(f"📊 {cat_label} bo'yicha import tahlili yaqin orada qo'shiladi (mantiqiy hisob-kitoblar talab etiladi).")
+    group = callback.data.split("_")[1]
+
+    groups_map = {
+        "Tops": "('Верхняя одежда', 'Комплект', 'Плечевые одежды')",
+        "Bottoms": "('Поясные одежды')",
+        "Shoes": "('Обувь')",
+        "Newborn": "('Новорождённый')",
+        "Others": "('Аксессуары', 'Головной убор', 'Игрушка', 'Нижнее белье')"
+    }
+
+    titles_map = {
+        "Tops": "🧥 UST KIYIMLAR",
+        "Bottoms": "👖 SHIMLAR VA YUBKALAR",
+        "Shoes": "👟 OYOQ KIYIMLAR",
+        "Newborn": "👶 CHAQALOQLAR UCHUN",
+        "Others": "🧢 AKSESSUAR VA BOSHQA"
+    }
+
+    target_cats = groups_map.get(group)
+    title = titles_map.get(group)
+
+    if not target_cats:
+        return
+
+    settings = db_manager.get_all_settings()
+    min_day = int(settings.get('m4_min_days', 1))
+    max_day = int(settings.get('m2_max_days', 15))
+
+    await callback.message.delete()
+    msg = await callback.message.answer(f"⏳ <b>{title}</b>\nMa'lumotlar yuklanmoqda ({min_day}-{max_day} kunlik)...")
+
+    query = text(f"""
+    SELECT * FROM generated_orders
+    WHERE days_passed >= :min_day AND days_passed <= :max_day
+    AND category IN {target_cats}
+    ORDER BY supplier ASC, subcategory ASC, artikul ASC
+    """)
+
+    try:
+        all_orders = pd.read_sql(query, db_manager.engine, params={"min_day": min_day, "max_day": max_day})       
+    except Exception as e:
+        await msg.edit_text(f"❌ Xatolik: {e}")
+        return
+
+    if all_orders.empty:
+        await msg.edit_text(f"✅ Hozircha <b>{title}</b> yo'nalishida {min_day}-{max_day} kunlik zakazlar topilmadi.")
+        return
+
+    unique_artikuls = all_orders['artikul'].unique()
+
+    batch_id = str(uuid.uuid4())[:8]
+    STAT_CACHE[batch_id] = {
+        'full_df': all_orders,
+        'artikuls': unique_artikuls,
+        'offset': 0,
+        'batch_size': 10
+    }
+
+    await send_mix_batch(callback.message.chat.id, batch_id)
 
 @router.callback_query(F.data.startswith("impRange_"))
-async def import_range_click(callback: CallbackQuery):
-    d_range = callback.data.split("_")[1]
-    await callback.answer(f"⏳ {d_range} kunlik import tahlili...")
-    # Tahlil mantiqi
-    await callback.message.answer(f"📊 {d_range} kunlik import tahlili yaqin orada qo'shiladi.")
+async def imp_range_click(callback: CallbackQuery):
+    mn, mx = map(int, callback.data.split("_")[1].split("-"))
+
+    cats = db_manager.get_stats_by_import_days(mn, mx)
+
+    if not cats:
+        await callback.answer("⚠️ Bu muddatda zakazlar yo'q", show_alert=True)
+        return
+
+    kb = []
+    for cat in cats:
+        unique_id = str(uuid.uuid4())[:8]
+        STAT_CACHE[unique_id] = (mn, mx, cat)
+        kb.append([InlineKeyboardButton(text=f"📂 {cat}", callback_data=f"impCat_{unique_id}")])
+
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="impBack_root")])
+
+    await callback.message.edit_text(
+        f"📅 <b>{mn}-{mx} kunlik tovarlar</b>\nKategoriyani tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data.startswith("impCat_"))
+async def imp_cat_click(callback: CallbackQuery):
+    uid = callback.data.split("_")[1]
+    data = STAT_CACHE.get(uid)
+    if not data: return
+
+    mn, mx, cat = data
+    subs = db_manager.get_stats_by_import_days(mn, mx, category=cat)
+
+    kb = []
+    for sub in subs:
+        unique_id = str(uuid.uuid4())[:8]
+        STAT_CACHE[unique_id] = (mn, mx, cat, sub)
+        kb.append([InlineKeyboardButton(text=f"🔹 {sub}", callback_data=f"impSub_{unique_id}")])
+
+    kb.append([InlineKeyboardButton(text="⬅️ Boshiga", callback_data="impBack_root")])
+
+    await callback.message.edit_text(
+        f"📂 <b>{cat}</b> ({mn}-{mx} kun)\nPodkategoriyani tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data.startswith("impSub_"))
+async def imp_sub_click(callback: CallbackQuery):
+    uid  = callback.data.split("_")[1]
+    data = STAT_CACHE.get(uid)
+    if not data:
+        return
+
+    mn, mx, cat, sub = data
+
+    def _get_orders():
+        return pd.read_sql(
+            text("SELECT * FROM generated_orders WHERE category = :cat AND subcategory = :sub"),
+            db_manager.engine, params={"cat": cat, "sub": sub}
+        )
+
+    all_orders = await asyncio.to_thread(_get_orders)
+
+    if all_orders.empty:
+        await callback.answer("⚠️ Ma'lumot topilmadi.", show_alert=True)
+        return
+
+    await callback.message.delete()
+    await callback.message.answer(f"⏳ <b>{cat} > {sub}</b>\nMa'lumotlar yuklanmoqda...")
+
+    now = datetime.now()
+    all_orders['created_at_dt'] = pd.to_datetime(all_orders['created_at'])
+
+    is_topdim = all_orders['status'] == 'Topdim'
+    is_new    = all_orders['status'] == 'Kutilmoqda'
+    is_late   = (now - all_orders['created_at_dt']).dt.days >= 3
+
+    red_df    = all_orders[is_topdim & is_late].copy()
+    yellow_df = all_orders[is_topdim & ~is_late].copy()
+    white_df  = all_orders[is_new].copy()
+
+    if not red_df.empty:
+        await message_sender(callback.message, red_df,    "🚨 <b>DIQQAT! KECHIKKANLAR (3+ kun):</b>", "red")      
+    if not white_df.empty:
+        await message_sender(callback.message, white_df,  "🔥 <b>YANGI EHTIYOJLAR:</b>",              "white", pending_df=yellow_df)
+    if not yellow_df.empty:
+        await message_sender(callback.message, yellow_df, "⏳ <b>JARAYONDA (Yo'lda):</b>",            "yellow")    
+
+    kb = [[InlineKeyboardButton(text="🔄 Boshqa bo'lim", callback_data="impBack_root")]]
+    await bot.send_message(callback.message.chat.id, "✅ Ro'yxat tugadi.",
+                           reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+async def message_sender(message, df, title, color_type, pending_df=None):
+    await bot.send_message(message.chat.id, title)
+
+    for article, group in df.groupby('artikul'):
+        first   = group.iloc[0]
+        caption = build_caption(article, group, first, color_type, pending_df)
+
+        kb = []
+        if color_type == 'white':
+            kb.append([
+                InlineKeyboardButton(text="✅ Topdim",    callback_data=f"feedback:Topdim:{article}"),
+                InlineKeyboardButton(text="❌ Topilmadi", callback_data=f"feedback:Topilmadi:{article}")
+            ])
+        else:
+            kb.append([
+                InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_order:{article}")
+            ])
+
+        photo = str(first.get('photo', ''))
+        try:
+            if photo.startswith('http'):
+                await bot.send_photo(message.chat.id, photo, caption=caption,
+                                     reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+            else:
+                await bot.send_message(message.chat.id, caption,
+                                       reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        except Exception:
+            await bot.send_message(message.chat.id, caption,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        await asyncio.sleep(0.2)
+
+@router.callback_query(F.data == "impBack_root")
+async def imp_back_root(callback: CallbackQuery):
+    await import_analysis_start(callback.message)
+
+async def send_mix_batch(chat_id, batch_id):
+    data = STAT_CACHE.get(batch_id)
+    if not data:
+        await bot.send_message(chat_id, "⚠️ Ma'lumot eskirgan. Iltimos, bo'limga qaytadan kiring.")
+        return
+
+    full_df = data['full_df']
+    all_artikuls = data['artikuls']
+    offset = data['offset']
+    limit = data['batch_size']
+
+    current_artikuls = all_artikuls[offset : offset + limit]
+
+    if len(current_artikuls) == 0:
+        await bot.send_message(chat_id, "✅ Ro'yxat to'liq tugadi.")
+        return
+
+    await bot.send_message(chat_id, f"🚀 <b>YUKLANMOQDA...</b>\n{offset+1} dan {offset+len(current_artikuls)} gacha (Jami: {len(all_artikuls)})")
+
+    batch_df = full_df[full_df['artikul'].isin(current_artikuls)].copy()
+
+    now = datetime.now()
+    batch_df['created_at_dt'] = pd.to_datetime(batch_df['created_at'])
+
+    is_topdim = batch_df['status'] == 'Topdim'
+    is_late = (now - batch_df['created_at_dt']).dt.days >= 3
+
+    batch_df = batch_df.sort_values(by=['supplier', 'artikul'])
+
+    red_df = batch_df[is_topdim & is_late]
+    yellow_df = batch_df[is_topdim & ~is_late]
+    white_df = batch_df[batch_df['status'] == 'Kutilmoqda']
+
+    class DummyMsg:
+        def __init__(self, cid): self.chat = type('obj', (object,), {'id': cid})
+
+    dummy_msg = DummyMsg(chat_id)
+
+    if not red_df.empty:
+        await message_sender(dummy_msg, red_df, "🚨 <b>DIQQAT! KECHIKKANLAR:</b>", "red")
+
+    if not white_df.empty:
+        full_yellow = full_df[(full_df['status']=='Topdim') & ~(full_df['artikul'].isin(current_artikuls))]       
+        await message_sender(dummy_msg, white_df, "🔥 <b>YANGI ZAKAZLAR:</b>", "white", pending_df=full_yellow)   
+
+    if not yellow_df.empty:
+        await message_sender(dummy_msg, yellow_df, "⏳ <b>JARAYONDA (Yo'lda):</b>", "yellow")
+
+    data['offset'] += limit
+
+    if data['offset'] < len(all_artikuls):
+        remains = len(all_artikuls) - data['offset']
+        kb = [
+            [InlineKeyboardButton(text=f"▶️ DAVOM ETISH (Yana {remains} ta)", callback_data=f"nextMix_{batch_id}")],
+            [InlineKeyboardButton(text="⏹ TO'XTATISH", callback_data="del_msg")]
+        ]
+        await bot.send_message(chat_id, "👇 Keyingi partiyani yuklaymizmi?", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    else:
+        kb = [[InlineKeyboardButton(text="🔄 Menyuga qaytish", callback_data="impBack_root")]]
+        await bot.send_message(chat_id, "✅ <b>BARCHASI YUBORILDI.</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+@router.callback_query(F.data.startswith("nextMix_"))
+async def next_mix_batch_handler(callback: CallbackQuery):
+    batch_id = callback.data.split("_")[1]
+    try:
+        await callback.message.delete()
+    except:
+        pass
+    await send_mix_batch(callback.message.chat.id, batch_id)

@@ -242,25 +242,135 @@ async def show_stock_dates(message: Message):
     )
 
 @router.callback_query(F.data.startswith("stqDate_"))
-async def stock_date_selected(callback: CallbackQuery):
-    date_str = callback.data.split("_")[1]
-    await callback.answer(f"⏳ {date_str} qoldiqlari...")
-    
-    asosiy, aksiya = await asyncio.to_thread(db_manager.get_stock_report_by_date, date_str)
-    
-    if not asosiy and not aksiya:
-        await callback.message.answer(f"⚠️ {date_str} uchun qoldiq ma'lumotlari topilmadi.")
+async def stock_date_click(callback: CallbackQuery):
+    target_date = callback.data.split("stqDate_", 1)[1]
+    categories = db_manager.get_stock_categories_on_date(target_date)
+
+    dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
+    pretty_date = dt_obj.strftime("%d.%m.%Y")
+
+    if not categories:
+        await callback.answer(f"⚠️ {pretty_date} sanasi uchun ma'lumot yo'q.", show_alert=True)
         return
-        
-    chart_buf = await asyncio.to_thread(generate_sales_table_image, asosiy, aksiya, {}, {}, f"QOLDIQ: {date_str}")
-    
-    if chart_buf:
-        photo = BufferedInputFile(chart_buf.getvalue(), filename="stock.png")
-        await bot.send_photo(
-            chat_id=callback.message.chat.id,
-            photo=photo,
-            caption=f"📦 <b>QOLDIQLAR: {date_str}</b>",
-            reply_markup=get_close_keyboard()
-        )
+
+    kb = []
+    for cat in categories:
+        unique_id = str(uuid.uuid4())[:8]
+        STAT_CACHE[unique_id] = (cat, target_date)
+        kb.append([InlineKeyboardButton(text=f"📂 {cat}", callback_data=f"stqCat_{unique_id}")])
+
+    kb.append([InlineKeyboardButton(text=f"📥 {pretty_date} bo'yicha Excel", callback_data=f"downStockEx_{target_date}")])
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_to_stock_dates")])
+    kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
+
+    await callback.message.edit_text(
+        f"📦 <b>QOLDIQLAR TAHLILI</b>\n"
+        f"📅 Tanlangan sana: <b>{pretty_date}</b>\n\n"
+        f"Hisobotni ko'rish uchun kategoriyani tanlang yoki Excel yuklab oling:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data == "back_to_stock_dates")
+async def back_to_stock_dates(callback: CallbackQuery):
+    dates = db_manager.get_last_7_stock_dates()
+    kb = []
+    for d in dates:
+        dt_obj = datetime.strptime(d, "%Y-%m-%d")
+        pretty_date = dt_obj.strftime("%d.%m.%Y")
+        kb.append([InlineKeyboardButton(text=f"📅 {pretty_date}", callback_data=f"stqDate_{d}")])
+
+    kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
+
+    await callback.message.edit_text(
+        f"📦 <b>QOLDIQLAR TAHLILI</b>\n\n"
+        f"Hisobotni ko'rish uchun oxirgi 7 kunlikdan sanani tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data.startswith("stqCat_"))
+async def stock_category_click(callback: CallbackQuery):
+    uid = callback.data.split("_")[1]
+    data = STAT_CACHE.get(uid)
+
+    if not data:
+        await callback.answer("⚠️ Ma'lumot eskirgan, qaytadan bosing.", show_alert=True)
+        return
+
+    category, target_date = data
+    dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
+    pretty_date = dt_obj.strftime("%d.%m.%Y")
+
+    asosiy_summary, aksiya_summary = db_manager.get_stock_subcategories_summary_v2(category, target_date)
+
+    text = f"📊 <b>{category} (Qoldiqlar)</b>\n"
+    text += f"📅 Sana: <b>{pretty_date}</b>\n\n"
+
+    text += "🏢 <b>ASOSIY TOVARLAR (010/011 bo'lmagan):</b>\n"
+    total_asosiy = 0
+    if asosiy_summary:
+        for sub, gender, qty in asosiy_summary:
+            text += f" 🔹 {sub} ({gender}): <b>{int(qty)} dona</b>\n"
+            total_asosiy += qty
+        text += f" 📦 <b>Jami Asosiy: {int(total_asosiy)} dona</b>\n\n"
     else:
-        await callback.message.answer("❌ Grafik yaratishda xatolik.")
+        text += " <i>Ma'lumot yo'q</i>\n\n"
+
+    text += "━━━━━━━━━━━━━━\n\n"
+
+    text += "🎁 <b>AKSIYA TOVARLARI (010/011 Artikullar):</b>\n"
+    total_aksiya = 0
+    if aksiya_summary:
+        for sub, gender, qty in aksiya_summary:
+            text += f" 🔸 {sub} ({gender}): <b>{int(qty)} dona</b>\n"
+            total_aksiya += qty
+        text += f" 📦 <b>Jami Aksiya: {int(total_aksiya)} dona</b>\n\n"
+    else:
+        text += " <i>Ma'lumot yo'q</i>\n\n"
+
+    text += "━━━━━━━━━━━━━━\n"
+    text += f"🚛 <b>UMUMIY JAMI QOLDIQ: {int(total_asosiy + total_aksiya)} dona</b>"
+
+    kb = [
+        [InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"stqDate_{target_date}")],
+        [InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")]
+    ]
+
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+@router.callback_query(F.data.startswith("downStockEx_"))
+async def download_stock_excel_handler(callback: CallbackQuery):
+    target_date = callback.data.split("_")[1]
+
+    msg = await callback.message.answer("⏳ Excel fayl tayyorlanmoqda, kuting...")
+
+    df_asosiy, df_aksiya, _ = await asyncio.to_thread(db_manager.get_all_stock_summary_for_excel, target_date)    
+
+    if df_asosiy.empty and df_aksiya.empty:
+        await msg.edit_text("⚠️ Ma'lumot topilmadi.")
+        return
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        if not df_asosiy.empty:
+            df_asosiy.to_excel(writer, index=False, sheet_name='Asosiy (Aksiyasiz)')
+            worksheet = writer.sheets['Asosiy (Aksiyasiz)']
+            for i, col in enumerate(df_asosiy.columns):
+                width = max(df_asosiy[col].astype(str).map(len).max(), len(col)) + 2
+                worksheet.set_column(i, i, width)
+
+        if not df_aksiya.empty:
+            df_aksiya.to_excel(writer, index=False, sheet_name='Aksiya (010)')
+            worksheet = writer.sheets['Aksiya (010)']
+            for i, col in enumerate(df_aksiya.columns):
+                width = max(df_aksiya[col].astype(str).map(len).max(), len(col)) + 2
+                worksheet.set_column(i, i, width)
+
+    output.seek(0)
+
+    dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
+    pretty_date = dt_obj.strftime("%d.%m.%Y")
+
+    file = BufferedInputFile(output.getvalue(), filename=f"Qoldiqlar_{pretty_date}.xlsx")
+    await callback.message.answer_document(file, caption=f"📦 <b>Qoldiqlar hisoboti</b>\n📅 Sana: {pretty_date}") 
+    await msg.delete()
+    await callback.answer()
