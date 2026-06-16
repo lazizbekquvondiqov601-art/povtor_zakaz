@@ -190,7 +190,7 @@ async def supplier_selected(callback: CallbackQuery, state: FSMContext):
         return
     _, supplier_name = data
     msg = await callback.message.edit_text(f"⏳ <b>{supplier_name}</b> yuklanmoqda...")
-    sotuv, qoldiq, start_date, end_date = await asyncio.to_thread(get_supplier_sales_report, supplier_name)
+    sotuv, qoldiq, start_date, end_date = await asyncio.to_thread(db_manager.get_supplier_sales_report, supplier_name)
 
     obr_uid = str(uuid.uuid4())[:8]
     STAT_CACHE[obr_uid] = ("sup_obr", supplier_name)

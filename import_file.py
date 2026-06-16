@@ -55,12 +55,16 @@ def sync_imports_by_dates(access_token, engine, start_date_str: str, end_date_st
             WHERE date(import_date) >= :start AND date(import_date) <= :end
         """), {"start": start_date_str, "end": end_date_str})
 
-    if not access_token or not BILLZ_PLATFORM_ID:
-        print("❌ access_token yoki BILLZ_PLATFORM_ID topilmadi!")
+    # Prefer token from .env if available, otherwise use the dynamic one
+    env_token = os.getenv("BILLZ_BEARER_TOKEN")
+    token_to_use = env_token if env_token else access_token
+
+    if not token_to_use or not BILLZ_PLATFORM_ID:
+        print("❌ Token yoki BILLZ_PLATFORM_ID topilmadi!")
         return "empty", None
 
     headers = {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": f"Bearer {token_to_use}",
         "Cookie": BILLZ_COOKIE or "",
         "platform-id": BILLZ_PLATFORM_ID,
         "accept": "application/json, text/plain, */*",

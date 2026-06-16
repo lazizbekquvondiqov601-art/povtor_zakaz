@@ -8,7 +8,7 @@ load_dotenv()
 # --- BOT SOZLAMALARI ---
 SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", 1205534758))
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ARCHIVE_CHANNEL_ID = int(os.getenv("ARCHIVE_CHANNEL_ID", -1003365677889))
+ARCHIVE_CHANNEL_ID = int(os.getenv("ARCHIVE_CHANNEL_ID", -1003971521196))
 
 # Admin ID'larni string'dan integer list'ga o'tkazish
 try:
