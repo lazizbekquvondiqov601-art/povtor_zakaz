@@ -125,7 +125,13 @@ async def obr_category_click(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("obrSub_"))
 async def obr_subcategory_click(callback: CallbackQuery):
-    _, session_id, sub_id = callback.data.split("_")
+    # Oldin faqat rasm jo'natar edi, endi segment tugmalari (Zakaz kerak, Kuzatuvda...) bilan chiqishi kerak
+    # callback format is obrSub_{session_id}_{sub_id} in current logic, let's keep it consistent or use obrSub_{session_id}_{cat_id}_{sub_id} like legacy?
+    # Wait, in current admin.py it's: f"obrSub_{session_id}_{sub_id}"
+    parts = callback.data.split("_")
+    session_id = parts[1]
+    sub_id = parts[2]
+    
     df = OBR_CACHE.get(session_id)
     sub_name = OBR_CACHE.get(f"sub_{sub_id}")
 
@@ -134,18 +140,194 @@ async def obr_subcategory_click(callback: CallbackQuery):
         return
 
     await callback.answer(f"📊 {sub_name} tahlili...")
-    chart_buf = await asyncio.to_thread(generate_macro_image, df, sub_name)
+    
+    img_buf = await asyncio.to_thread(generate_macro_image, df, sub_name)
 
-    if chart_buf:
-        photo = BufferedInputFile(chart_buf.getvalue(), filename="obr.png")
+    sub_df = df[df['Подкатегория'] == sub_name]
+    segments = sorted(sub_df['Real_Sotuv_Segmenti'].unique().tolist())
+
+    kb = []
+    for seg in segments:
+        if not seg: continue
+        seg_id = str(uuid.uuid4())[:8]
+        OBR_CACHE[f"seg_{seg_id}"] = seg
+        kb.append([InlineKeyboardButton(
+            text=f"🔹 {seg.split('(')[0].strip()}",
+            callback_data=f"obrSegMenu_{session_id}_{sub_id}_{seg_id}"
+        )])
+
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_back_root")])
+
+    if img_buf:
+        try:
+            await callback.message.delete()
+        except:
+            pass
+        photo = BufferedInputFile(img_buf.getvalue(), filename="obr.png")
         await bot.send_photo(
             chat_id=callback.message.chat.id,
             photo=photo,
-            caption=f"📊 <b>OBR TAHLIL: {sub_name}</b>",
-            reply_markup=get_close_keyboard()
+            caption=f"📊 <b>OBR TAHLIL: {sub_name}</b>\n\nQaysi segmentni ko'rmoqchisiz?",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
         )
     else:
-        await callback.message.answer(f"❌ {sub_name} uchun grafik yaratishda xatolik.")
+        await callback.message.edit_text(
+            f"❌ {sub_name} uchun grafik yaratishda xatolik.\nQaysi segmentni ko'rmoqchisiz?",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+        )
+
+@router.callback_query(F.data.startswith("obrSegMenu_"))
+async def obr_seg_menu_click(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    _, session_id, sub_id, seg_id = parts
+    seg_name = OBR_CACHE.get(f"seg_{seg_id}")
+    sub_name = OBR_CACHE.get(f"sub_{sub_id}")
+
+    if not seg_name or not sub_name:
+        await callback.answer("⏳ Ma'lumot eskirgan.", show_alert=True)
+        return
+
+    kb = [
+        [InlineKeyboardButton(text="🛒 ZAKAZ KERAK", callback_data=f"obrSegDet_{session_id}_{sub_id}_{seg_id}_zakaz")],
+        [InlineKeyboardButton(text="👁 KUZATUVDA", callback_data=f"obrSegDet_{session_id}_{sub_id}_{seg_id}_kuzat")],
+        [InlineKeyboardButton(text="📋 HAMMASI", callback_data=f"obrSegDet_{session_id}_{sub_id}_{seg_id}_all")],
+        [InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"obrSub_{session_id}_{sub_id}")],
+    ]
+
+    text = f"📦 <b>{sub_name}</b>\n🔹 <b>{seg_name}</b>\n\nQaysi bo'limni ko'rmoqchisiz?"
+    
+    try:
+        if callback.message.photo:
+            await callback.message.delete()
+            await bot.send_message(callback.message.chat.id, text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        else:
+            await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    except Exception:
+        await bot.send_message(callback.message.chat.id, text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+@router.callback_query(F.data.startswith("obrSegDet_"))
+async def obr_seg_detail_click(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    _, session_id, sub_id, seg_id, mode = parts 
+    df       = OBR_CACHE.get(session_id)
+    sub_name = OBR_CACHE.get(f"sub_{sub_id}")
+    seg_name = OBR_CACHE.get(f"seg_{seg_id}")
+
+    if df is None or not sub_name or not seg_name:
+        await callback.answer("⏳ Ma'lumot eskirgan.", show_alert=True)
+        return
+
+    seg_df = df[
+        (df['Подкатегория'] == sub_name) &
+        (df['Real_Sotuv_Segmenti'] == seg_name)
+    ].copy()
+
+    if mode == "zakaz":
+        seg_df = seg_df[seg_df['Zakaz'] > 0]
+    elif mode == "kuzat":
+        seg_df = seg_df[seg_df['Zakaz'] == 0]
+        seg_df = seg_df[~((seg_df['Hozirgi_Qoldiq'] >= 5) & (seg_df['Продано'] < 5))]
+    elif mode == "all":
+        seg_df = seg_df[~((seg_df['Hozirgi_Qoldiq'] >= 5) & (seg_df['Продано'] < 5))]
+        
+    if seg_df.empty:
+        await callback.answer("⚠️ Bu bo'limda ma'lumot yo'q.", show_alert=True)
+        return
+
+    def razmer_sort_key(r):
+        r = str(r).strip()
+        if '-' in r:
+            try: return int(r.split('-')[0])
+            except: pass
+        try: return int(r)
+        except: return 9999
+
+    seg_df['_razmer_sort'] = seg_df['Размер сетка'].apply(razmer_sort_key)
+
+    if 'Пол' in seg_df.columns:
+        seg_df['_jins'] = seg_df['Пол'].fillna('').astype(str).str.strip()
+    elif 'Вид2' in seg_df.columns:
+        seg_df['_jins'] = seg_df['Вид2'].fillna('').astype(str).str.strip()
+    else:
+        seg_df['_jins'] = 'Универсал'
+
+    seg_df['_jins'] = seg_df['_jins'].replace('', 'Универсал')
+
+    JINS_NORMALIZE = {
+        'Девочек': 'Девочки',
+        'Мальчик': 'Мальчики',
+    }
+    seg_df['_jins'] = seg_df['_jins'].apply(lambda x: JINS_NORMALIZE.get(x, x))
+
+    JINS_ORDER = ['Девочки', 'Мальчики', 'Универсал']
+    JINS_ICONS = {
+        'Девочки': '👧',
+        'Мальчики': '👦',
+        'Универсал': '🌐'
+    }
+
+    def jins_sort_key(v):
+        try: return JINS_ORDER.index(str(v).strip())
+        except: return len(JINS_ORDER)
+
+    seg_df['_jins_sort'] = seg_df['_jins'].apply(jins_sort_key)
+    seg_df = seg_df.sort_values(['_jins_sort', '_razmer_sort']).reset_index(drop=True)
+
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    jinslar_sorted = sorted(seg_df['_jins'].unique(), key=jins_sort_key)
+
+    text_blocks = []
+    header = f"📦 <b>{sub_name}</b>\n\n"
+    current_text = header
+
+    for jins in jinslar_sorted:
+        jins_df = seg_df[seg_df['_jins'] == jins]
+        icon = JINS_ICONS.get(jins, '👤')
+
+        for _, row in jins_df.iterrows():
+            razmer = str(row.get('Размер сетка', '')) or "Noma'lum"
+            mat    = str(row.get('Материал2', '')) or "—"
+            vid    = str(row.get('Вид2', '')) or "—"
+            nom    = str(row.get('Наименование', '')) or "—"
+            zakaz  = row.get('Zakaz', 0)
+            qoldiq = row.get('Hozirgi_Qoldiq', 0)
+            sotuv  = row.get('Продано', 0)
+            obr    = row.get('OBR %', '0%')
+
+            item_text = (
+                f" {icon} {jins}\n\n"
+                f" 📌 <b><i>{nom}</i></b>\n"
+                f"{seg_name}|📐 <b>{razmer} yosh </b>|  {mat}  | 🎨 {vid} |\n"
+                f"  🛒 <b>ZAKAZ: {zakaz} ta</b>\n\n"
+                f"  | Sotuv: <b>{sotuv}</b> | Qoldiq: <b>{qoldiq}</b> | OBR: <b>{obr}</b> |\n"
+                "  ──────────────────────\n"
+            )
+
+            if len(current_text) + len(item_text) > 4000:
+                text_blocks.append(current_text)
+                current_text = item_text
+            else:
+                current_text += item_text
+
+        current_text += "\n"
+
+    if current_text.strip():
+        text_blocks.append(current_text)
+
+    kb = [[InlineKeyboardButton(
+        text="⬅️ Orqaga",
+        callback_data=f"obrSegMenu_{session_id}_{sub_id}_{seg_id}"
+    )]]
+
+    for i, t_block in enumerate(text_blocks):
+        if i == len(text_blocks) - 1:
+            await bot.send_message(callback.message.chat.id, t_block, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        else:
+            await bot.send_message(callback.message.chat.id, t_block)
 
 # --- MAJBURIY YANGILASH ---
 
