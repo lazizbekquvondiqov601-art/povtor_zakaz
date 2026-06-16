@@ -959,3 +959,61 @@ def remove_admin_db(telegram_id: int) -> bool:
         return False
     finally:
         session.close()
+
+def get_supplier_sales_report(supplier_name: str) -> tuple:
+    """Oy boshidan hisoblaydi (Legacy logic)"""
+    try:
+        session = Session()
+        try:
+            now = datetime.now(TASHKENT_TZ).replace(tzinfo=None)
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d")
+            end_date   = now.strftime("%Y-%m-%d")
+
+            like_pattern = f"%{supplier_name}%"
+            params = {"supplier": like_pattern, "start_date": start_date, "end_date": end_date}
+
+            query_sotuv = text('''
+                SELECT
+                    COALESCE(NULLIF(TRIM(s."Категория"), ''), 'Boshqa') as kat,
+                    SUM(s."Продано за вычетом возвратов") as total_sold,
+                    SUM(s."Валовая прибыль") as total_profit
+                FROM f_sotuvlar s
+                JOIN d_mahsulotlar d ON s.product_id = d.product_id
+                WHERE d."Поставщик" LIKE :supplier
+                  AND date(s."Дата") >= :start_date
+                  AND date(s."Дата") <= :end_date
+                  AND s."Артикул" NOT LIKE '010%'
+                  AND s."Артикул" NOT LIKE '011%'
+                  AND s."Наименование" NOT LIKE 'Пакет%'
+                GROUP BY kat
+                ORDER BY total_profit DESC
+            ''')
+
+            query_qoldiq = text('''
+                SELECT
+                    COALESCE(NULLIF(TRIM(q."Категория"), ''), 'Boshqa') as kat,
+                    SUM(q."Кол-во") as total_qty
+                FROM f_qoldiqlar q
+                JOIN d_mahsulotlar d ON q.product_id = d.product_id
+                WHERE d."Поставщик" LIKE :supplier
+                  AND date(q."Дата") = (SELECT MAX(date("Дата")) FROM f_qoldiqlar)
+                  AND q."Артикул" NOT LIKE '010%'
+                  AND q."Артикул" NOT LIKE '011%'
+                  AND q."Категория" IS NOT NULL
+                  AND TRIM(q."Категория") != ''
+                GROUP BY kat
+                HAVING SUM(q."Кол-во") > 0
+            ''')
+
+            sotuv_rows  = session.execute(query_sotuv,  params).fetchall()
+            qoldiq_rows = session.execute(query_qoldiq, params).fetchall()
+
+            sotuv  = {kat: {"qty": float(q or 0), "profit": float(p or 0)} for kat, q, p in sotuv_rows}
+            qoldiq = {kat: float(q or 0) for kat, q in qoldiq_rows}
+
+            return sotuv, qoldiq, start_date, end_date
+        finally:
+            session.close()
+    except Exception as e:
+        print(f"❌ Supplier hisobotida xatolik: {e}")
+        return {}, {}, "", ""
