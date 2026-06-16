@@ -381,6 +381,32 @@ def get_supplier_stats_detailed(telegram_id: int):
 
 # --- ADMIN STATISTIKASI UCHUN YANGI FUNKSIYALAR ---
 
+def get_supplier_stats_detailed(telegram_id: int):
+    """
+    Yetkazib beruvchi uchun: Kategoriya va Podkategoriya bo'yicha pochkalarni hisoblaydi.
+    """
+    session = Session()
+    try:
+        supplier = session.query(Supplier).filter_by(telegram_id=telegram_id).first()
+        if not supplier:
+            return []
+
+        results = session.query(
+            GeneratedOrder.category,
+            GeneratedOrder.subcategory,
+            func.sum(GeneratedOrder.quantity)
+        ).filter(
+            GeneratedOrder.supplier == supplier.name,
+            GeneratedOrder.status == 'Kutilmoqda'
+        ).group_by(
+            GeneratedOrder.category,
+            GeneratedOrder.subcategory
+        ).all()
+
+        return results
+    finally:
+        session.close()
+
 def get_stat_categories_global():
     """Faqat 'Kutilmoqda' statusidagi bor Kategoriyalar ro'yxatini qaytaradi"""
     session = Session()

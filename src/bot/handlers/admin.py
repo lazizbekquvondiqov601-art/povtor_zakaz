@@ -96,6 +96,35 @@ async def auto_zakaz_click(message: Message):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
 
+@router.callback_query(F.data.startswith("obrBackRoot_"))
+async def obr_back_root(callback: CallbackQuery):
+    session_id = callback.data.split("_")[1]
+    df = OBR_CACHE.get(session_id)
+    if df is None:
+        await callback.answer("⏳ Ma'lumot eskirgan, qaytadan hisoblang.", show_alert=True)
+        return
+    
+    cats = sorted(df['Категория'].unique().tolist())
+    kb = []
+    for c in cats:
+        if not c: continue
+        cat_id = str(uuid.uuid4())[:8]
+        OBR_CACHE[f"cat_{cat_id}"] = c
+        kb.append([InlineKeyboardButton(text=f"📁 {c}", callback_data=f"obrCat_{session_id}_{cat_id}")])
+    kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
+
+    text = "📊 <b>ASOSIY ZAKAZ (OBR)</b>\n\nQaysi kategoriyani ko'rmoqchisiz?"
+    markup = InlineKeyboardMarkup(inline_keyboard=kb)
+    
+    try:
+        if callback.message.photo:
+            await callback.message.delete()
+            await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
+        else:
+            await callback.message.edit_text(text, reply_markup=markup)
+    except Exception:
+        await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
+
 @router.callback_query(F.data.startswith("obrCat_"))
 async def obr_category_click(callback: CallbackQuery):
     _, session_id, cat_id = callback.data.split("_")
@@ -116,12 +145,19 @@ async def obr_category_click(callback: CallbackQuery):
         OBR_CACHE[f"sub_{sub_id}"] = s
         kb.append([InlineKeyboardButton(text=f"🔹 {s}", callback_data=f"obrSub_{session_id}_{cat_id}_{sub_id}")])
 
-    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_back_root")]) 
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data=f"obrBackRoot_{session_id}")]) 
 
-    await callback.message.edit_text(
-        f"📂 <b>{category}</b>\n\nIchki turlarni (podkategoriya) tanlang:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
-    )
+    text = f"📂 <b>{category}</b>\n\nIchki turlarni (podkategoriya) tanlang:"
+    markup = InlineKeyboardMarkup(inline_keyboard=kb)
+
+    try:
+        if callback.message.photo:
+            await callback.message.delete()
+            await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
+        else:
+            await callback.message.edit_text(text, reply_markup=markup)
+    except Exception:
+        await bot.send_message(callback.message.chat.id, text, reply_markup=markup)
 
 @router.callback_query(F.data.startswith("obrSub_"))
 async def obr_subcategory_click(callback: CallbackQuery):
@@ -205,6 +241,7 @@ async def obr_seg_menu_click(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("obrSegDet_"))
 async def obr_seg_detail_click(callback: CallbackQuery):
+    await callback.answer()
     parts = callback.data.split("_")
     _, session_id, cat_id, sub_id, seg_id, mode = parts 
     df       = OBR_CACHE.get(session_id)
@@ -212,7 +249,8 @@ async def obr_seg_detail_click(callback: CallbackQuery):
     seg_name = OBR_CACHE.get(f"seg_{seg_id}")
 
     if df is None or not sub_name or not seg_name:
-        await callback.answer("⏳ Ma'lumot eskirgan.", show_alert=True)
+        await callback.message.answer("⏳ Ma'lumot eskirgan.")
+        return
         return
 
     seg_df = df[

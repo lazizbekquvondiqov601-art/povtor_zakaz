@@ -30,6 +30,69 @@ async def get_orders_for_supplier(supplier_name: str) -> pd.DataFrame:
     df = await asyncio.to_thread(_read_db)
     return df
 
+from src.bot.keyboards.admin import get_admin_keyboard
+
+@router.message(F.text == "🔑 Admin Bo'lish")
+async def become_admin_handler(message: Message):
+    user_id = message.from_user.id
+    success = db_manager.add_admin_db(user_id)
+    if success:
+        await message.answer(
+            "🎉 <b>Tabriklaymiz! Siz muvaffaqiyatli ADMIN qilib tayyinlandingiz.</b>\n\n"
+            "Endi siz hisobotlar, statistika, qoldiqlar va kelgan tovarlar tahlilini ko'ra olasiz.",
+            reply_markup=get_admin_keyboard()
+        )
+    else:
+        await message.answer(
+            "⚠️ Siz allaqachon adminlar ro'yxatida mavjudsiz. Menyuni tanlang:",
+            reply_markup=get_admin_keyboard()
+        )
+
+@router.message(F.text == "📝 Ismni o'zgartirish")
+async def change_name_text(message: Message, state: FSMContext):
+    categories = db_manager.get_unassigned_categories()
+    if not categories:
+        await message.answer("⚠️ Hozircha bo'sh yetkazib beruvchilar yoki zakazlar yo'q.")
+        return
+    kb_builder = []
+    for cat in categories:
+        kb_builder.append([InlineKeyboardButton(text=cat, callback_data=f"regCat_{cat}")])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=kb_builder)
+    await message.answer("📂 Iltimos, faoliyatingiz turini (Kategoriya) tanlang:", reply_markup=keyboard)
+    await state.set_state(Registration.filter_category)
+
+@router.message(F.text == "📈 Statistika")
+async def show_statistics(message: Message):
+    user_id = message.from_user.id
+    # We don't check for IsAdmin here because this handler is in supplier.py, 
+    # but since both can trigger it, we'll implement the supplier logic. 
+    # If they are an admin, the admin.py handler will catch it first.
+    
+    supplier = db_manager.get_supplier_by_id(user_id)
+    current_name = supplier.name if supplier else "Noma'lum"
+    data = db_manager.get_supplier_stats_detailed(user_id)
+
+    if not data:
+        await message.answer(f"👤 Ism: <b>{current_name}</b>\n✅ Hozircha sizda bajarilmagan zakazlar yo'q.")
+        return
+
+    report = {}
+    total_packs = 0
+    for cat, sub, qty in data:
+        if cat not in report:
+            report[cat] = []
+        report[cat].append(f"▫️ {sub}: <b>{int(qty)} pochka</b>")
+        total_packs += qty
+
+    text = f"📊 <b>SIZNING ZAKAZLARINGIZ:</b>\n"
+    text += f"👤 Ism: <b>{current_name}</b>\n\n"
+    for category, lines in report.items():
+        text += f"📂 <b>{category}</b>\n"
+        text += "\n".join(lines) + "\n\n"
+    text += f"━━━━━━━━━━━━━━\n🚛 <b>JAMI: {int(total_packs)} POCHKA</b>"
+    
+    await message.answer(text)
+
 @router.message(F.text == "🔄 Supplier Menyu")
 async def switch_to_supplier_handler(message: Message):
     user_id = message.from_user.id
@@ -73,12 +136,12 @@ async def my_orders_handler(message: Message):
     await msg.delete()
 
     if new_orders.empty and red_orders.empty:
-        await message.answer("✅ Yangi yoki Muammoli zakazlar yo'q.")
+        await message.answer("✅ Yangi yoki Muammoli zakazlar yo'q.\n'⏳ Jarayonda' tugmasini tekshiring.")
         return
 
     # --- QIZIL (KECHIKKANLAR) ---
     if not red_orders.empty:
-        await message.answer(f"🚨 <b>DIQQAT! KELMAGAN TOVARLAR:</b>")
+        await message.answer(f"🚨 <b>DIQQAT! KELMAGAN TOVARLAR:</b>\n<i>3 kundan oshdi!</i>")
         for article, group in red_orders.groupby('artikul'):
             first = group.iloc[0]
             kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -109,6 +172,156 @@ async def my_orders_handler(message: Message):
                 logger.error(f"Error sending photo for {article}: {e}")
                 await bot.send_message(message.chat.id, caption, reply_markup=kb)
             await asyncio.sleep(0.3)
+
+@router.message(F.text == "⏳ Jarayonda")
+async def pending_orders_text(message: types.Message):
+    def _get_cats():
+        return pd.read_sql(
+            "SELECT DISTINCT category FROM generated_orders WHERE status = 'Topdim' ORDER BY category",
+            db_manager.engine
+        )
+
+    cats_df = await asyncio.to_thread(_get_cats)
+
+    if cats_df.empty:
+        await message.answer("✅ Jarayonda (Yo'lda) hech qanday zakaz yo'q.")
+        return
+
+    kb = []
+    for cat in cats_df['category']:
+        unique_id = str(uuid.uuid4())[:8]
+        STAT_CACHE[unique_id] = cat
+        kb.append([InlineKeyboardButton(text=f"📂 {cat}", callback_data=f"pendCat_{unique_id}")])
+    kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
+
+    await message.answer(
+        "⏳ <b>JARAYONDA (YO'LDA)</b>\nQaysi bo'limni ko'rmoqchisiz?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data.startswith("pendCat_"))
+async def pending_category_click(callback: CallbackQuery):
+    uid      = callback.data.split("_")[1]
+    category = STAT_CACHE.get(uid)
+
+    if not category:
+        await callback.answer("⚠️ Eskirgan ma'lumot.", show_alert=True)
+        return
+
+    def _get_subs():
+        return pd.read_sql(
+            """SELECT DISTINCT subcategory FROM generated_orders
+               WHERE status = 'Topdim' AND category = :cat ORDER BY subcategory""",
+            db_manager.engine, params={"cat": category}
+        )
+
+    subs_df = await asyncio.to_thread(_get_subs)
+
+    kb = []
+    for sub in subs_df['subcategory']:
+        unique_id = str(uuid.uuid4())[:8]
+        STAT_CACHE[unique_id] = (category, sub)
+        kb.append([InlineKeyboardButton(text=f"🔹 {sub}", callback_data=f"pendSub_{unique_id}")])
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_to_pend_cats")])
+
+    await callback.message.edit_text(
+        f"📂 <b>{category}</b> (Jarayonda)\nPodkategoriyani tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data == "back_to_pend_cats")
+async def back_pend_cats(callback: CallbackQuery):
+    await callback.message.delete()
+    await pending_orders_text(callback.message)
+
+@router.callback_query(F.data.startswith("pendSub_"))
+async def pending_subcategory_click(callback: CallbackQuery):
+    uid = callback.data.split("_")[1]
+    data = STAT_CACHE.get(uid)
+    if not data: return
+
+    category, subcategory = data
+
+    query = """
+    SELECT * FROM generated_orders
+    WHERE status = 'Topdim' AND category = :cat AND subcategory = :sub
+    """
+    orders_df = pd.read_sql(query, db_manager.engine, params={"cat": category, "sub": subcategory})
+
+    if orders_df.empty:
+        await callback.answer("✅ Bu bo'lim tozalandi (Hamma yuk kelgan).", show_alert=True)
+        return
+
+    await callback.message.delete()
+    await callback.message.answer(f"⏳ <b>{subcategory}</b>\nYuklanmoqda...")
+
+    orders_df['created_at_dt'] = pd.to_datetime(orders_df['created_at'])
+    now = datetime.now()
+    mask_red = (now - orders_df['created_at_dt']).dt.days >= 3
+
+    red_orders = orders_df[mask_red].copy()
+    yellow_orders = orders_df[~mask_red].copy()
+
+    if not red_orders.empty:
+        await show_pending_group(callback.message, red_orders, "🚨 <b>DIQQAT! KECHIKKANLAR (3+ kun):</b>", "red") 
+
+    if not yellow_orders.empty:
+        await show_pending_group(callback.message, yellow_orders, "⏳ <b>JARAYONDA (Yo'lda):</b>", "yellow")       
+
+    kb = [[InlineKeyboardButton(text="🔄 Boshqa bo'lim", callback_data="back_to_pend_cats")]]
+    await bot.send_message(callback.message.chat.id, "✅ Ro'yxat tugadi.", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+async def show_pending_group(message, df, title, color_type):
+    await bot.send_message(message.chat.id, title)
+
+    for article, group in df.groupby('artikul'):
+        first   = group.iloc[0]
+        caption = build_caption_helper(article, group, first, color_type)
+        kb = [[InlineKeyboardButton(text="❌ Bekor qilish", callback_data=f"cancel_order:{article}")]]
+
+        photo = str(first.get('photo', ''))
+        try:
+            if photo.startswith('http'):
+                await bot.send_photo(message.chat.id, photo, caption=caption,
+                                     reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+            else:
+                await bot.send_message(message.chat.id, caption,
+                                       reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        except Exception:
+            await bot.send_message(message.chat.id, caption,
+                                   reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+        await asyncio.sleep(0.2)
+
+@router.callback_query(F.data.startswith("cancel_order:"))
+async def cancel_order_handler(callback: CallbackQuery):
+    artikul = callback.data.split(":")[1]
+    confirm_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Ha, Bekor qilish", callback_data=f"confirm_cancel:{artikul}"),
+         InlineKeyboardButton(text="Yo'q, Qaytish", callback_data="del_msg")]
+    ])
+    await callback.message.answer(f"⚠️ <b>{artikul}</b> ni 'Kutilmoqda' ro'yxatidan o'chirib tashlamoqchimisiz?\n(Keyingi safar yana Yangi bo'lib chiqadi)", reply_markup=confirm_kb)
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("confirm_cancel:"))
+async def confirm_cancel_handler(callback: CallbackQuery):
+    artikul = callback.data.split(":")[1]
+    try:
+        from sqlalchemy import text
+        with db_manager.engine.begin() as conn:
+            query = text(f"""
+                UPDATE generated_orders
+                SET status = 'Kutilmoqda'
+                WHERE artikul = '{artikul}' AND status = 'Topdim'
+            """)
+            result = conn.execute(query)
+
+        if result.rowcount > 0:
+            await callback.message.edit_text(f"✅ <b>{artikul}</b> bekor qilindi.\nQaytadan 'Yangi Zakazlar'ga tushdi.")
+        else:
+            await callback.message.edit_text(f"⚠️ <b>{artikul}</b> o'zgarmadi. Balki allaqachon bekor qilingandir?")
+
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Xatolik: {e}")
 
 def build_caption_helper(article, group, first, color_type, pending_df=None):
     icon = {'white': '📦', 'yellow': '🟡', 'red': '🔴'}.get(color_type, '📦')

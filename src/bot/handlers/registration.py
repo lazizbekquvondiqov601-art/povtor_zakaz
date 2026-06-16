@@ -11,9 +11,13 @@ from src.bot.handlers.common import send_welcome
 logger = logging.getLogger(__name__)
 router = Router()
 
-@router.callback_query(Registration.filter_category, F.data.startswith("regCat_"))
+@router.callback_query(Registration.filter_category, F.data.contains("Cat_") | F.data.contains("catSel_"))
 async def category_selected(callback: CallbackQuery, state: FSMContext):
-    category = callback.data.split("regCat_", 1)[1]
+    data_str = callback.data
+    if "regCat_" in data_str: category = data_str.split("regCat_", 1)[1]
+    elif "catSel_" in data_str: category = data_str.split("catSel_", 1)[1]
+    else: category = data_str
+
     logger.info(f"User {callback.from_user.id} selected category {category}")
     await state.update_data(selected_category=category)
     subcategories = db_manager.get_unassigned_subcategories(category)
@@ -33,9 +37,24 @@ async def category_selected(callback: CallbackQuery, state: FSMContext):
     )
     await state.set_state(Registration.filter_subcategory)
 
-@router.callback_query(Registration.filter_subcategory, F.data.startswith("uniSub_"))
+@router.callback_query(F.data == "back_to_cats_uni")
+async def back_uni_cat(callback: CallbackQuery, state: FSMContext):
+    await send_welcome(callback.message, state)
+
+@router.callback_query(F.data == "back_to_subs_uni")
+async def back_uni_sub(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    category = data.get("selected_category")
+    new_callback = callback.model_copy(update={'data': f"regCat_{category}"})
+    await category_selected(new_callback, state)
+
+@router.callback_query(Registration.filter_subcategory, F.data.contains("Sub_") | F.data.contains("subSel_"))
 async def subcategory_selected(callback: CallbackQuery, state: FSMContext):
-    subcategory = callback.data.split("uniSub_", 1)[1]
+    data_str = callback.data
+    if "uniSub_" in data_str: subcategory = data_str.split("uniSub_", 1)[1]
+    elif "subSel_" in data_str: subcategory = data_str.split("subSel_", 1)[1]
+    else: subcategory = data_str
+
     logger.info(f"User {callback.from_user.id} selected subcategory {subcategory}")
     data = await state.get_data()
     category = data.get("selected_category")
