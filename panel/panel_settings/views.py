@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.db import connections
+from django.db.utils import OperationalError, ProgrammingError, DatabaseError
 from django.contrib import messages
 import src.database.db_manager as db_manager
 
@@ -67,7 +68,13 @@ RULE_GROUPS = [
 
 @login_required
 def settings_main(request):
-    settings = db_manager.get_all_settings()
+    # get_all_settings o'zi xatoda {} qaytaradi, lekin har ehtimolga qarshi
+    # bu yerda ham himoyalaymiz — jadval yo'q bo'lsa sahifa baribir ochilsin.
+    try:
+        settings = db_manager.get_all_settings()
+    except (OperationalError, ProgrammingError, DatabaseError, Exception) as e:
+        print(f"[settings_main] sozlamalarni olishda xatolik: {e}")
+        settings = {}
 
     groups = []
     for g in RULE_GROUPS:
@@ -94,28 +101,38 @@ def settings_update(request):
     if request.method != 'POST':
         return redirect('panel_settings:main')
 
-    with connections['botdb'].cursor() as cursor:
-        for key in request.POST:
-            if key == 'csrfmiddlewaretoken':
-                continue
-            if key == 'global_lock':
-                float_val = 1.0
-            else:
-                try:
-                    float_val = float(request.POST[key])
-                except (ValueError, TypeError):
+    try:
+        with connections['botdb'].cursor() as cursor:
+            for key in request.POST:
+                if key == 'csrfmiddlewaretoken':
                     continue
+                if key == 'global_lock':
+                    float_val = 1.0
+                else:
+                    try:
+                        float_val = float(request.POST[key])
+                    except (ValueError, TypeError):
+                        continue
 
-            cursor.execute(
-                "UPDATE settings SET rule_value = %s WHERE rule_name = %s",
-                [float_val, key]
-            )
+                cursor.execute(
+                    "UPDATE settings SET rule_value = %s WHERE rule_name = %s",
+                    [float_val, key]
+                )
 
-        # global_lock checkbox tanllanmasa — 0 qo'yamiz
-        if 'global_lock' not in request.POST:
-            cursor.execute(
-                "UPDATE settings SET rule_value = 0.0 WHERE rule_name = 'global_lock'"
-            )
+            # global_lock checkbox tanllanmasa — 0 qo'yamiz
+            if 'global_lock' not in request.POST:
+                cursor.execute(
+                    "UPDATE settings SET rule_value = 0.0 WHERE rule_name = 'global_lock'"
+                )
 
-    messages.success(request, "Sozlamalar muvaffaqiyatli saqlandi!")
+        messages.success(request, "Sozlamalar muvaffaqiyatli saqlandi!")
+    except (OperationalError, ProgrammingError, DatabaseError, Exception) as e:
+        # settings jadvali yo'q (bot hali init_db qilmagan) — sahifa qulamasin
+        print(f"[settings_update] saqlashda xatolik: {e}")
+        messages.error(
+            request,
+            "Sozlamalar saqlanmadi: ma'lumotlar bazasi hali tayyor emas. "
+            "Bot ishga tushgach qaytadan urinib ko'ring."
+        )
+
     return redirect('panel_settings:main')

@@ -219,6 +219,10 @@ def get_all_settings() -> dict:
     try:
         settings = session.query(Setting).all()
         return {s.rule_name: s.rule_value for s in settings}
+    except Exception as e:
+        # Jadval yo'q (Railway da bot hali init_db qilmagan) — bo'sh sozlamalar
+        print(f"❌ get_all_settings xatolik: {e}")
+        return {}
     finally:
         session.close()
 
