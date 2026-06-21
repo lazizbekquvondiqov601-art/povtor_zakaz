@@ -18,6 +18,9 @@ except (ValueError, AttributeError):
 
 # --- BAZA VA FAYLLAR ---
 POSTGRES_URL = os.getenv("DATABASE_URL") or "sqlite:///Data_Model.db"
+# Railway ba'zan "postgres://" beradi, SQLAlchemy esa "postgresql://" talab qiladi
+if POSTGRES_URL.startswith("postgres://"):
+    POSTGRES_URL = POSTGRES_URL.replace("postgres://", "postgresql://", 1)
 DB_PATH = "database/Data_Model.db"
 PRODUCTS_JSON_FILE = "products_cataloglar.json"
 LAST_SYNC_FILE = "database/catalog_last_sync.txt"

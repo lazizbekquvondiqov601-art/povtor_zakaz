@@ -89,17 +89,38 @@ TEMPLATES = [
 WSGI_APPLICATION = 'panel_config.wsgi.application'
 
 # --- Ma'lumotlar bazalari (ikkita) ---
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR.parent / 'panel_data.db',
-    },
-    'botdb': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR.parent / 'Data_Model.db',
-        'OPTIONS': {'timeout': 20},
-    },
-}
+# Railway da DATABASE_URL (Postgres) beriladi -> ikkala connection ham
+# bitta umumiy Postgres ga ulanadi. Bu MUHIM: web (Django) va worker (bot)
+# alohida servicelarda ishlaydi va faqat umumiy Postgres orqali bir xil
+# ma'lumotni ko'radi. Railway file system ephemeral bo'lgani uchun SQLite
+# bu yerda ishlamaydi.
+#
+# Lokal kompyuterda DATABASE_URL Postgres bo'lmasa, eski SQLite fayllarga
+# qaytadi (lokal development buzilmaydi).
+_pg_url = os.getenv('DATABASE_URL', '')
+_is_postgres = _pg_url.startswith('postgres')
+
+if _is_postgres:
+    # dj_database_url faqat Postgres rejimida kerak (lokal SQLite da emas)
+    import dj_database_url
+    # Railway: ikkala connection ham umumiy Postgres ga
+    DATABASES = {
+        'default': dj_database_url.parse(_pg_url, conn_max_age=600),
+        'botdb': dj_database_url.parse(_pg_url, conn_max_age=600),
+    }
+else:
+    # Lokal development: eski SQLite fayllar
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR.parent / 'panel_data.db',
+        },
+        'botdb': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR.parent / 'Data_Model.db',
+            'OPTIONS': {'timeout': 20},
+        },
+    }
 
 # Router — qaysi modelni qaysi bazaga yuborishni hal qiladi
 DATABASE_ROUTERS = ['panel_config.db_router.BotDbRouter']
@@ -128,9 +149,12 @@ USE_TZ = True
 
 # --- Statik fayllar ---
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+# static papka bo'lmasa collectstatic xato bermasligi uchun shartli
+STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# ManifestStaticFilesStorage hamma faylni manifestda topa olmasa har bir
+# sahifani 500 qiladi. Production da xavfsizroq Compressed (manifestsiz) variant.
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Default primary key
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

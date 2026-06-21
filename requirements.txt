@@ -11,5 +11,6 @@ matplotlib
 numpy
 gunicorn
 whitenoise
+dj-database-url
 django>=4.0
 

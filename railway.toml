@@ -1,0 +1,12 @@
+# Railway "web" service konfiguratsiyasi.
+# DIQQAT: bu fayl WEB service uchun. Bot uchun ALOHIDA service yarating
+# va uning startCommand ini "python bot.py" qilib qo'ying (yoki Procfile
+# "worker" process ini tanlang).
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "bash start_web.sh"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
