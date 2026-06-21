@@ -20,8 +20,11 @@ sys.path.insert(0, str(BASE_DIR.parent))
 # db_manager SQLAlchemy uchun absolute DB yo'li
 # config.py "sqlite:///Data_Model.db" (nisbiy) ishlatadi — panel/ dan noto'g'ri ochiladi
 # DATABASE_URL env var orqali to'g'ri absolute yo'lni beramiz
-_db_abs = str(BASE_DIR.parent / 'Data_Model.db').replace('\\', '/')
+_db_abs      = str(BASE_DIR.parent / 'Data_Model.db').replace('\\', '/')
+_panel_db_abs = str(BASE_DIR.parent / 'panel_data.db').replace('\\', '/')
+# start_all.sh eksplisit export qiladi; agar yo'q bo'lsa fallback
 os.environ.setdefault('DATABASE_URL', f'sqlite:///{_db_abs}')
+os.environ.setdefault('PANEL_DB_URL',  f'sqlite:///{_panel_db_abs}')
 
 # --- Asosiy sozlamalar ---
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-panel-super-admin-change-me-in-production')
@@ -115,14 +118,22 @@ if _is_postgres:
     }
 else:
     # Lokal development: eski SQLite fayllar
+    # Mutlaq yo'l (start_all.sh export qilgan yoki fallback)
+    _bot_db_path   = os.getenv('DATABASE_URL', '').replace('sqlite:////', '/').replace('sqlite:///', str(BASE_DIR.parent / 'Data_Model.db'))
+    _panel_db_path = os.getenv('PANEL_DB_URL', '').replace('sqlite:////', '/').replace('sqlite:///', str(BASE_DIR.parent / 'panel_data.db'))
+    if not _bot_db_path.startswith('/'):
+        _bot_db_path = str(BASE_DIR.parent / 'Data_Model.db')
+    if not _panel_db_path.startswith('/'):
+        _panel_db_path = str(BASE_DIR.parent / 'panel_data.db')
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR.parent / 'panel_data.db',
+            'NAME': _panel_db_path,
         },
         'botdb': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR.parent / 'Data_Model.db',
+            'NAME': _bot_db_path,
             'OPTIONS': {'timeout': 20},
         },
     }
