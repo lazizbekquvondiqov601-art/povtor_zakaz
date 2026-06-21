@@ -2,15 +2,16 @@
 # Bot + Web bitta containerda. Bot background, gunicorn foreground.
 set -e
 
-cd "$(dirname "$0")"
+APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$APP_DIR"
 
 echo ">>> migrate..."
-python panel/manage.py migrate --noinput
+cd "$APP_DIR/panel"
+python manage.py migrate --noinput
 
-echo ">>> superuser tekshirilmoqda..."
+echo ">>> superuser..."
 python - <<'PYEOF'
-import os, django, sys
-sys.path.insert(0, 'panel')
+import os, django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'panel_config.settings')
 django.setup()
 from django.contrib.auth import get_user_model
@@ -21,21 +22,19 @@ email    = os.environ.get('PANEL_ADMIN_EMAIL', 'admin@example.com')
 if password and not User.objects.filter(username=username).exists():
     User.objects.create_superuser(username=username, email=email, password=password)
     print(f">>> Superuser '{username}' yaratildi.")
-else:
-    print(f">>> Superuser '{username}' allaqachon mavjud.")
 PYEOF
 
 echo ">>> collectstatic..."
-python panel/manage.py collectstatic --noinput --clear 2>/dev/null || true
+python manage.py collectstatic --noinput --clear 2>/dev/null || true
 
-echo ">>> Bot background da ishga tushyapti..."
+echo ">>> Bot background..."
+cd "$APP_DIR"
 python bot.py &
-BOT_PID=$!
-echo ">>> Bot PID: $BOT_PID"
+echo ">>> Bot PID: $!"
 
-echo ">>> Gunicorn PORT=${PORT:-8000} da ishga tushyapti..."
-exec gunicorn panel.panel_config.wsgi:application \
-    --chdir panel \
+echo ">>> Gunicorn PORT=${PORT:-8000}..."
+cd "$APP_DIR/panel"
+exec gunicorn panel_config.wsgi:application \
     --bind "0.0.0.0:${PORT:-8000}" \
     --workers 2 \
     --timeout 120 \
