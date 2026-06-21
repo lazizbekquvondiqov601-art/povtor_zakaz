@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 from sqlalchemy import text as sa_text
+from sqlalchemy.exc import OperationalError
 import pandas as pd
 import openpyxl
 import src.database.db_manager as db_manager
@@ -181,7 +182,16 @@ def olik_tovarlar(request):
         GROUP BY podkat, q."Артикул", rang
         ORDER BY jami_summa DESC
     """)
-    df = pd.read_sql(sql_main, engine)
+    try:
+        df = pd.read_sql(sql_main, engine)
+    except (OperationalError, Exception) as e:
+        # Jadvallar yo'q (Railway da bot hali ma'lumot yuklamagan) — bo'sh jadval
+        print(f"[olik_tovarlar] sql_main xatolik: {e}")
+        df = pd.DataFrame(columns=[
+            'podkat', 'artikul', 'naimenovanie', 'foto', 'postavchik', 'pol',
+            'rang', 'import_date', 'aksiya', 'qoldiq', 'tan_narxi',
+            'sotuv_narxi', 'jami_summa',
+        ])
 
     # --- 2) sotuv_90 ---
     sql_s90 = sa_text("""
@@ -194,7 +204,11 @@ def olik_tovarlar(request):
         WHERE date(s."Дата") >= date('now', '-90 days')
         GROUP BY s."Артикул", rang
     """)
-    df_s90 = pd.read_sql(sql_s90, engine)
+    try:
+        df_s90 = pd.read_sql(sql_s90, engine)
+    except (OperationalError, Exception) as e:
+        print(f"[olik_tovarlar] sql_s90 xatolik: {e}")
+        df_s90 = pd.DataFrame(columns=['artikul', 'rang', 'sotuv_90', 'sotuv_summa'])
 
     # --- Merge sotuv_90 (artikul + rang bo'yicha) ---
     if not df.empty:
@@ -335,7 +349,15 @@ def olik_tovarlar(request):
                 GROUP BY podkat, q."Артикул", rang, d."Баркод"
                 ORDER BY jami_summa DESC
             """)
-            df_bc = pd.read_sql(sql_barcode, engine)
+            try:
+                df_bc = pd.read_sql(sql_barcode, engine)
+            except (OperationalError, Exception) as e:
+                print(f"[olik_tovarlar] sql_barcode xatolik: {e}")
+                df_bc = pd.DataFrame(columns=[
+                    'podkat', 'artikul', 'naimenovanie', 'foto', 'rang', 'barcode',
+                    'import_date', 'aksiya', 'qoldiq', 'tan_narxi',
+                    'sotuv_narxi', 'jami_summa',
+                ])
 
             # --- sotuv_90 merge (artikul + rang bo'yicha) ---
             if not df_bc.empty:

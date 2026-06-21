@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.utils import timezone
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
 import openpyxl
 import src.database.db_manager as db_manager
 from core.excel_export import to_num, style_header, style_total, set_col_widths, make_response
@@ -36,6 +37,9 @@ def _get_all_kats():
     session = db_manager.Session()
     try:
         return [r[0] for r in session.execute(sql).fetchall()]
+    except (OperationalError, Exception) as e:
+        print(f"[analytics] _get_all_kats xatolik: {e}")
+        return []
     finally:
         session.close()
 
@@ -51,6 +55,9 @@ def _get_all_subkats():
     session = db_manager.Session()
     try:
         return [r[0] for r in session.execute(sql).fetchall()]
+    except (OperationalError, Exception) as e:
+        print(f"[analytics] _get_all_subkats xatolik: {e}")
+        return []
     finally:
         session.close()
 
@@ -200,6 +207,11 @@ def _build_table(start_date, end_date, kat_filters=None, subkat_filters=None):
         avg_as    = {r[0]: float(r[1] or 0) for r in session.execute(sql_avg_as,  params).fetchall()}
         marja_raw = {r[0]: (float(r[1] or 0), float(r[2] or 0))
                      for r in session.execute(sql_marja, params).fetchall()}
+    except (OperationalError, Exception) as e:
+        # Jadvallar yo'q (Railway da bot hali ma'lumot yuklamagan) — bo'sh natija
+        print(f"[analytics] _build_table xatolik: {e}")
+        as_rows, ak_rows = [], []
+        q_as, q_ak, avg_as, marja_raw = {}, {}, {}, {}
     finally:
         session.close()
 
