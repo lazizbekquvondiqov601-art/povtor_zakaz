@@ -30,7 +30,12 @@ ALLOWED_HOSTS = ['*']
 
 # Railway domain uchun CSRF
 _web_url = os.getenv('WEB_URL', '')
-CSRF_TRUSTED_ORIGINS = [_web_url] if _web_url else []
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.railway.app',
+    'https://*.up.railway.app',
+]
+if _web_url:
+    CSRF_TRUSTED_ORIGINS.append(_web_url)
 
 # --- O'rnatilgan ilovalar ---
 INSTALLED_APPS = [
