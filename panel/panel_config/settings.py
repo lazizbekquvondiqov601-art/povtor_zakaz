@@ -24,9 +24,13 @@ _db_abs = str(BASE_DIR.parent / 'Data_Model.db').replace('\\', '/')
 os.environ.setdefault('DATABASE_URL', f'sqlite:///{_db_abs}')
 
 # --- Asosiy sozlamalar ---
-SECRET_KEY = 'django-insecure-panel-super-admin-change-me-in-production'
-DEBUG = True
-ALLOWED_HOSTS = ['*']  # development uchun
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-panel-super-admin-change-me-in-production')
+DEBUG = os.getenv('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = ['*']
+
+# Railway domain uchun CSRF
+_web_url = os.getenv('WEB_URL', '')
+CSRF_TRUSTED_ORIGINS = [_web_url] if _web_url else []
 
 # --- O'rnatilgan ilovalar ---
 INSTALLED_APPS = [

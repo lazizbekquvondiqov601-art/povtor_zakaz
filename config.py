@@ -26,6 +26,9 @@ LAST_SYNC_FILE = "database/catalog_last_sync.txt"
 BILLZ_SECRET_KEY = os.getenv("BILLZ_SECRET_KEY")
 ALL_SHOPS_IDS = os.getenv("BILLZ_SHOP_IDS")
 
+# --- WEB PANEL ---
+WEB_URL = os.getenv("WEB_URL", "").rstrip("/")
+
 # --- BIZNES LOGIKA ---
 AKSIYA_PREFIXES = ('010', '011')
 EXCLUDED_NAMES = ('Пакет',)
