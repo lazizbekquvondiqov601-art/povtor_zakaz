@@ -1,0 +1,195 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ category }} — OBR — Zakaz Panel{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Page header */
+.page-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-6); flex-wrap:wrap; gap:var(--space-3); }
+.page-title { font-size:var(--text-2xl); font-weight:var(--weight-bold); color:var(--text-strong); }
+
+/* Breadcrumb */
+.breadcrumb-nav { display:flex; align-items:center; gap:var(--space-2); font-size:var(--text-sm); margin-bottom:var(--space-4); }
+.breadcrumb-nav a { color:var(--text-muted); text-decoration:none; }
+.breadcrumb-nav a:hover { color:var(--accent); }
+.breadcrumb-sep { color:var(--text-muted); opacity:0.4; }
+.breadcrumb-current { color:var(--text-body); font-weight:var(--weight-semibold); }
+
+/* DS Card */
+.ds-card { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); }
+.ds-card-header { padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--border-subtle); font-weight:var(--weight-semibold); font-size:var(--text-base); color:var(--text-strong); display:flex; align-items:center; gap:var(--space-3); }
+
+/* DS Table */
+.ds-table { width:100%; border-collapse:collapse; font-size:var(--text-sm); }
+.ds-table th { padding:10px 14px; text-align:left; font-size:var(--text-xs); font-weight:var(--weight-bold); letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border-subtle); }
+.ds-table td { padding:10px 14px; border-bottom:1px solid var(--border-subtle); color:var(--text-body); vertical-align:middle; }
+.ds-table tr:last-child td { border-bottom:none; }
+.ds-table tr:hover td { background:var(--surface-sunken); }
+
+/* DS Button */
+.ds-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-family:var(--font-sans); font-size:var(--text-xs); font-weight:var(--weight-semibold); border-radius:var(--radius-md); border:none; cursor:pointer; transition:background 0.15s; text-decoration:none; }
+.ds-btn-primary { background:var(--accent); color:#fff; }
+.ds-btn-primary:hover { background:var(--accent-hover); color:#fff; }
+.ds-btn svg { width:13px; height:13px; }
+
+/* DS Badge */
+.ds-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:var(--radius-pill); font-size:var(--text-xs); font-weight:var(--weight-semibold); }
+.ds-badge-primary { background:var(--accent-soft); color:var(--accent); }
+
+/* OBR Color badges */
+.obr-badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font-size:var(--text-xs); font-weight:var(--weight-bold); font-family:var(--font-mono); }
+.obr-green  { background:#dcfce7; color:#166534; }
+.obr-yellow { background:#fef9c3; color:#854d0e; }
+.obr-orange { background:#ffedd5; color:#9a3412; }
+.obr-red    { background:#fee2e2; color:#991b1b; }
+
+/* KPI kartalar */
+.kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); margin-bottom:var(--space-5); }
+.kpi-card { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); }
+.kpi-label { font-size:var(--text-xs); font-weight:var(--weight-bold); text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.kpi-label svg { width:13px; height:13px; }
+.kpi-value { font-family:var(--font-mono); font-size:var(--text-2xl); font-weight:var(--weight-bold); color:var(--text-strong); }
+@media (max-width:640px) { .kpi-row { grid-template-columns:1fr 1fr; } }
+
+/* Summary stat pill */
+.sub-stats { display:flex; gap:var(--space-2); flex-wrap:wrap; }
+.sub-stat-pill { font-size:var(--text-xs); padding:2px 8px; border-radius:var(--radius-pill); font-weight:var(--weight-semibold); }
+.pill-zakaz { background:#dcfce7; color:#166534; }
+.pill-count { background:var(--surface-sunken); color:var(--text-muted); }
+
+/* Empty state */
+.empty-state { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-8); text-align:center; }
+
+/* ── Mobile (telefon) — max-width:640px ── */
+@media (max-width: 640px) {
+    .page-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .page-head > div:last-child { width: 100%; flex-wrap: wrap; }
+    .page-title { font-size: var(--text-xl); }
+
+    /* Jadval — yonga scroll qilib ko'riladi (overflow:auto wrapper saqlanadi) */
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Breadcrumb -->
+<nav class="breadcrumb-nav">
+    <a href="/obr/">OBR</a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">{{ category }}</span>
+</nav>
+
+<div class="page-head">
+    <div>
+        <div class="page-title">{{ category }}</div>
+        {% if supplier_filter %}
+        <div style="margin-top:4px;display:flex;align-items:center;gap:8px;">
+            <span style="background:#ede9fe;color:#5b21b6;padding:3px 12px;border-radius:999px;font-size:var(--text-xs);font-weight:600;">
+                <svg data-lucide="user" style="width:11px;height:11px;display:inline;"></svg>
+                {{ supplier_filter }}
+            </span>
+            <a href="/obr/{{ category|urlencode }}/" style="font-size:var(--text-xs);color:var(--text-muted);text-decoration:none;">✕ filtrni olib tashlash</a>
+        </div>
+        {% endif %}
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+    <a href="?{% if supplier_filter %}supplier={{ supplier_filter|urlencode }}&{% endif %}export=1"
+       class="ds-btn" style="background:#16a34a;color:#fff;" title="Excel yuklab olish">
+        <svg data-lucide="download"></svg> Excel
+    </a>
+    {% if cat_total_zakaz > 0 %}
+    <span class="ds-badge ds-badge-primary" style="font-size:var(--text-sm);padding:4px 14px;">
+        Jami: {{ cat_total_zakaz }} pochka zakaz
+    </span>
+    {% endif %}
+    </div>
+</div>
+
+<!-- KPI kartalar -->
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-label">
+            <svg data-lucide="shopping-cart"></svg> Jami sotuv
+        </div>
+        <div class="kpi-value">{{ cat_total_sotuv }}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">dona</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">
+            <svg data-lucide="archive"></svg> Jami qoldiq
+        </div>
+        <div class="kpi-value">{{ cat_total_qoldiq }}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">dona</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">
+            <svg data-lucide="percent"></svg> Umumiy OBR
+        </div>
+        <div class="kpi-value">
+            <span class="obr-badge {{ cat_obr_class }}" style="font-size:var(--text-xl);padding:4px 14px;">
+                {{ cat_total_obr }}%
+            </span>
+        </div>
+    </div>
+</div>
+
+{% if not subcategories %}
+    <div class="empty-state">
+        <div style="font-weight:var(--weight-semibold);color:var(--text-strong);margin-bottom:var(--space-2);">"{{ category }}" uchun podkategoriyalar topilmadi</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted);">Bot ma'lumotlar bazasini tekshiring.</div>
+    </div>
+{% else %}
+    <div class="ds-card">
+        <div class="ds-card-header">
+            Podkategoriyalar
+            <span class="ds-badge ds-badge-primary">{{ subcategories|length }} ta</span>
+        </div>
+        <div style="overflow:auto;">
+            <table class="ds-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;">#</th>
+                        <th>Podkategoriya</th>
+                        <th style="text-align:center;">Segmentlar</th>
+                        <th style="text-align:center;">Zakaz</th>
+                        <th style="text-align:center;">Tovar soni</th>
+                        <th style="text-align:center;">O'rt. OBR</th>
+                        <th style="width:100px;">Harakat</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sub in subcategories %}
+                    <tr>
+                        <td data-label="#" style="color:var(--text-muted);font-family:var(--font-mono);font-size:var(--text-xs);">{{ forloop.counter }}</td>
+                        <td data-label="Podkategoriya" style="font-weight:var(--weight-semibold);color:var(--text-strong);">{{ sub.name }}</td>
+                        <td data-label="Segmentlar" style="text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);">{{ sub.seg_count }}</td>
+                        <td data-label="Zakaz" style="text-align:center;">
+                            {% if sub.total_zakaz > 0 %}
+                                <span class="sub-stat-pill pill-zakaz">{{ sub.total_zakaz }}</span>
+                            {% else %}
+                                <span style="color:var(--text-muted);">0</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Tovar soni" style="text-align:center;">
+                            <span class="sub-stat-pill pill-count">{{ sub.zakaz_rows }}/{{ sub.total_rows }}</span>
+                        </td>
+                        <td data-label="O'rt. OBR" style="text-align:center;">
+                            <span class="obr-badge {{ sub.obr_class }}">{{ sub.avg_obr }}%</span>
+                        </td>
+                        <td data-label="Harakat">
+                            <a href="/obr/{{ category|urlencode }}/{{ sub.name|urlencode }}/{% if supplier_filter %}?supplier={{ supplier_filter|urlencode }}{% endif %}"
+                               class="ds-btn ds-btn-primary">
+                                Ko'rish
+                                <svg data-lucide="arrow-right"></svg>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+
+{% endblock %}

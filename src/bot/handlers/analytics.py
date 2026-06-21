@@ -71,6 +71,7 @@ async def stat_back_root(callback: CallbackQuery):
     kb = []
     for cat in categories:
         kb.append([InlineKeyboardButton(text=f"📂 {cat}", callback_data=f"stCat_{cat}")])
+    kb.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="stat_back")])
     kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
     await callback.message.edit_text(
         "📊 <b>UMUMIY STATISTIKA</b>\n\nQaysi bo'limni ko'rmoqchisiz?",
@@ -394,7 +395,23 @@ async def message_sender(message, df, title, color_type, pending_df=None):
 
 @router.callback_query(F.data == "impBack_root")
 async def imp_back_root(callback: CallbackQuery):
-    await import_analysis_start(callback.message)
+    settings = db_manager.get_all_settings()
+    kb = [
+        [InlineKeyboardButton(text="🧥 Ust kiyimlar", callback_data="impMix_Tops"), InlineKeyboardButton(text="👖 Shim/Yubka", callback_data="impMix_Bottoms")],
+        [InlineKeyboardButton(text="👟 Oyoq kiyim", callback_data="impMix_Shoes"), InlineKeyboardButton(text="👶 Chaqaloqlar", callback_data="impMix_Newborn")],
+        [InlineKeyboardButton(text="🧢 Boshqalar", callback_data="impMix_Others")]
+    ]
+    rule_labels = {4: "🔥 4-Qoida", 3: "⚡️ 3-Qoida", 2: "⚠️ 2-Qoida", 1: "❄️ 1-Qoida"}
+    for i in [4, 3, 2, 1]:
+        min_d, max_d = int(settings.get(f'm{i}_min_days', 0)), int(settings.get(f'm{i}_max_days', 0))
+        if max_d > 0:
+            kb.append([InlineKeyboardButton(text=f"{rule_labels[i]}: {min_d}-{max_d} kun", callback_data=f"impRange_{min_d}-{max_d}")])
+    kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
+    try:
+        await callback.message.edit_text("📅 <b>IMPORT TAHLILI</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    except Exception:
+        await callback.message.answer("📅 <b>IMPORT TAHLILI</b>", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await callback.answer()
 
 async def send_mix_batch(chat_id, batch_id):
     data = STAT_CACHE.get(batch_id)

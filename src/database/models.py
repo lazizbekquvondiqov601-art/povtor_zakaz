@@ -37,6 +37,7 @@ class GeneratedOrder(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     zakaz_id = Column(String, index=True)
+    product_id = Column(String, nullable=True)  # product_id (d_mahsulotlar bilan bog'lanish uchun)
     supplier = Column(String)
     artikul = Column(String)
     category = Column(String)

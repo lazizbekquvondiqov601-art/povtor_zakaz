@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from src.utils.helpers import classify_imported_product, format_money
+from data_normalizer import normalize_dataframe
 
 TASHKENT_TZ = timezone(timedelta(hours=5))
 
@@ -19,10 +20,18 @@ def calculate_auto_zakaz(engine) -> pd.DataFrame:
         # Eslatma: Hozirgi bazada ustun nomi "Продано за вычетом возвратов"
         f_sotuvlar  = pd.read_sql('SELECT "product_id", "Магазин", "Продано за вычетом возвратов", "Дата" FROM f_sotuvlar', engine)
         f_qoldiqlar = pd.read_sql('SELECT "product_id", "Магазин", "Кол-во", "Дата" FROM f_qoldiqlar', engine)
+        f_sotuvlar['Продано за вычетом возвратов'] = pd.to_numeric(f_sotuvlar['Продано за вычетом возвратов'], errors='coerce').fillna(0)
+        f_qoldiqlar['Кол-во'] = pd.to_numeric(f_qoldiqlar['Кол-во'], errors='coerce').fillna(0)
 
         # 2. Tozalash va Formatlash
         for df in [d_mahsulotlar, f_sotuvlar, f_qoldiqlar]:
             df['product_id'] = df['product_id'].astype(str).str.strip().str.lower()
+
+        # --- NORMALIZE: bazada eski duplikatlar qolsa ham bir xil qilamiz ---
+        normalize_dataframe(d_mahsulotlar, columns=[
+            'Категория', 'Подкатегория', 'Вид', 'Материал', 'Пол',
+            'Наименование', 'Поставщик',
+        ])
 
         # Aksiya tovarlarini (010/011) olib tashlash
         d_mahsulotlar['Артикул'] = d_mahsulotlar['Артикул'].astype(str).str.strip()
@@ -147,7 +156,7 @@ def calculate_auto_zakaz(engine) -> pd.DataFrame:
 
         # Pochka sonini yaxlitlash (5 tadan)
         seg_df['Zakaz'] = (np.ceil(raw_zakaz / 5) * 5).astype(int)
-        seg_df['OBR %'] = (np.round(obr * 100)).astype(int).astype(str) + '%'
+        seg_df['OBR %'] = pd.Series((np.round(obr * 100)).astype(int), index=seg_df.index).astype(str) + '%'
 
         # 6. Natija
         cols = ['Категория', 'Подкатегория', 'Наименование', 'Real_Sotuv_Segmenti', 'Размер сетка', 'Материал2', 'Вид2', 'Пол', 'Поставщик', 'Zakaz', 'Hozirgi_Qoldiq', 'Продано', 'OBR %', 'Ortacha_Qoldiq']
@@ -160,5 +169,5 @@ def calculate_auto_zakaz(engine) -> pd.DataFrame:
         return result_df.drop(columns=['Разmer_sort'])
 
     except Exception as e:
-        print(f"❌ Auto_Zakaz tahlilida xatolik: {e}")
+        print(f"Auto_Zakaz xatolik: {e}")
         return pd.DataFrame()

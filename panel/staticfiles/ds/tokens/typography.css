@@ -1,0 +1,41 @@
+/* ============================================================
+   Zakaz Panel — Typography tokens
+   Manrope for everything UI; JetBrains Mono for figures/IDs.
+   Admin density: base sits at 15px.
+   ============================================================ */
+:root {
+  --font-sans: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Tabular figures — apply to any numeric/data context */
+  --num-features: "tnum" 1, "lnum" 1; /* @kind other */
+
+  /* Type scale */
+  --text-xs:   0.75rem;   /* 12 — micro labels, table meta */
+  --text-sm:   0.8125rem; /* 13 — secondary, badges */
+  --text-base: 0.9375rem; /* 15 — body / table cells */
+  --text-md:   1rem;      /* 16 — emphasized body */
+  --text-lg:   1.125rem;  /* 18 — card titles */
+  --text-xl:   1.375rem;  /* 22 — section heads */
+  --text-2xl:  1.75rem;   /* 28 — page titles */
+  --text-3xl:  2.25rem;   /* 36 — KPI values */
+  --text-display: 3rem;   /* 48 — hero stat */
+
+  /* Weights */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  /* Line heights */
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* Letter spacing */
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;   /* uppercase eyebrow labels */
+}

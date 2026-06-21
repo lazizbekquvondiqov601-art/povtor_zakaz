@@ -1,4 +1,9 @@
+import sys
 import asyncio
+if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding and sys.stderr.encoding.lower() != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from src.bot.init_bot import bot, dp, OBR_CACHE, STAT_CACHE
 from src.bot.handlers import setup_handlers

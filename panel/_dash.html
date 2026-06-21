@@ -1,0 +1,216 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Super Admin Panel</title>
+
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    
+    <link href="/static/panel/css/panel.css" rel="stylesheet">
+
+    <style>
+        /* Sidebar — chap panel stillar */
+        .sidebar {
+            width: 240px;
+            min-height: 100vh;
+            background: #1a1a2e;
+            color: #fff;
+        }
+        .sidebar .nav-link {
+            color: #ccc;
+            padding: 10px 16px;
+        }
+        .sidebar .nav-link:hover,
+        .sidebar .nav-link.active {
+            color: #fff;
+            background: #16213e;
+            border-left: 3px solid #0f3460;
+        }
+        /* Asosiy kontent maydoni */
+        .main-content {
+            flex: 1;
+            background: #f8f9fa;
+            overflow-y: auto;
+        }
+        /* KPI kartalar uchun umumiy stil */
+        .kpi-card {
+            border-radius: 12px;
+            padding: 20px;
+            color: #fff;
+        }
+    </style>
+
+    
+</head>
+<body>
+
+
+<nav class="navbar navbar-dark bg-dark px-3">
+    <span class="navbar-brand mb-0 h1">Super Admin Panel</span>
+    <div class="d-flex align-items-center">
+        
+            <span class="text-light me-3">debugadmin</span>
+            
+            <form action="/logout/" method="post" class="m-0">
+                <input type="hidden" name="csrfmiddlewaretoken" value="QgQN8Nhc8hZvOUzq0fBEvz34ODNamjXnJfQHz8hjnfwLB3YE2JhHwBRjvHIivYq4">
+                <button type="submit" class="btn btn-sm btn-outline-light">Chiqish</button>
+            </form>
+        
+    </div>
+</nav>
+
+
+<div class="d-flex">
+
+    
+    <nav class="sidebar py-3 flex-shrink-0">
+        <ul class="nav flex-column">
+
+            
+            <li class="nav-item">
+                <a class="nav-link active"
+                   href="/">
+                    &#127968; Dashboard
+                </a>
+            </li>
+
+            
+            <li class="nav-item">
+                <a class="nav-link "
+                   href="/obr/">
+                    &#128202; Asosiy Zakaz
+                </a>
+            </li>
+
+            
+            <li class="nav-item">
+                <a class="nav-link "
+                   href="/supplier/">
+                    &#128269; Supplier Tahlil
+                </a>
+            </li>
+
+            
+            <li class="nav-item">
+                <a class="nav-link "
+                   href="/analytics/">
+                    &#128200; Statistika
+                </a>
+            </li>
+
+            
+            <li class="nav-item">
+                <a class="nav-link "
+                   href="/stock/">
+                    &#128230; Qoldiqlar
+                </a>
+            </li>
+
+            
+            <li class="nav-item">
+                <a class="nav-link "
+                   href="/settings/">
+                    &#9881; Sozlamalar
+                </a>
+            </li>
+
+            
+            <li class="nav-item mt-3">
+                <hr style="border-color: #444; margin: 0 16px;">
+            </li>
+
+            
+            <li class="nav-item">
+                <form action="/logout/" method="post" class="m-0">
+                    <input type="hidden" name="csrfmiddlewaretoken" value="QgQN8Nhc8hZvOUzq0fBEvz34ODNamjXnJfQHz8hjnfwLB3YE2JhHwBRjvHIivYq4">
+                    <button type="submit"
+                            class="nav-link btn btn-link text-start w-100"
+                            style="color: #ccc; padding: 10px 16px;">
+                        &#128682; Chiqish
+                    </button>
+                </form>
+            </li>
+
+        </ul>
+    </nav>
+
+    
+    <main class="main-content px-4 py-4 w-100">
+        
+
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Dashboard</h2>
+    <span class="text-muted">Bugun: 2026-06-18</span>
+</div>
+
+
+<div class="row g-3 mb-4">
+
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="kpi-card" style="background: #e74c3c;">
+            <div class="small mb-1 opacity-75">&#128176; Bugungi sotuv</div>
+            <div class="fs-3 fw-bold">0</div>
+            <div class="small opacity-75">so'm</div>
+        </div>
+    </div>
+
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="kpi-card" style="background: #27ae60;">
+            <div class="small mb-1 opacity-75">&#128230; Joriy qoldiq</div>
+            <div class="fs-3 fw-bold">22052</div>
+            <div class="small opacity-75">dona</div>
+        </div>
+    </div>
+
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="kpi-card" style="background: #2980b9;">
+            <div class="small mb-1 opacity-75">&#128722; Kutilmoqda</div>
+            <div class="fs-3 fw-bold">62</div>
+            <div class="small opacity-75">zakaz</div>
+        </div>
+    </div>
+
+    
+    <div class="col-md-6 col-lg-3">
+        <div class="kpi-card" style="background: #f39c12;">
+            <div class="small mb-1 opacity-75">&#128101; Yetkazib beruvchilar</div>
+            <div class="fs-3 fw-bold">21</div>
+            <div class="small opacity-75">ta</div>
+        </div>
+    </div>
+
+</div>
+
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">Tezkor harakatlar</h5>
+        <p class="text-muted mb-0">
+            OBR, Supplier, Statistika va boshqa modullar keyingi bosqichlarda qo'shiladi.
+        </p>
+    </div>
+</div>
+
+
+    </main>
+
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+
+
+</body>
+</html>

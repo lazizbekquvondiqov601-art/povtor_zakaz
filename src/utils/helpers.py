@@ -1,13 +1,17 @@
 import pandas as pd
 from datetime import datetime
 import config
+from data_normalizer import canonical_form
 
 def classify_imported_product(subcategory: str, retail_price: float) -> str:
     """Mahsulotni podkategoriya va narxi bo'yicha segmentlarga ajratadi (DAX logic)."""
     if not subcategory:
         return "Boshqa tovarlar"
 
-    sub   = str(subcategory).strip()
+    # Defensiv: bazadan eski normalize qilinmagan qiymat kelsa ham
+    # canonical formga keltiramiz ('двойка' -> 'Двойка' va h.k.).
+    sub_normalized = canonical_form(subcategory, "Подкатегория")
+    sub   = str(sub_normalized or subcategory).strip()
     price = float(retail_price or 0)
 
     if sub == "Двойка":
@@ -189,7 +193,8 @@ def build_caption(article, group, first, color_type, pending_df=None):
         except: price_str = '0'
         caption += f"👤 {first.get('supplier', '-')}\n💵 {price_str} so'm\n"
     elif color_type in ('yellow', 'red'):
-        caption += f"({first.get('supplier', 'Noma\u02bclum')})\n"
+        _unknown = 'Noma\u02bclum'
+        caption += f"({first.get('supplier', _unknown)})\n"
 
     for shop, s_group in group.groupby('shop'):
         caption += f"\n🏪 <b>{shop}:</b>"

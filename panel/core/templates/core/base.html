@@ -1,0 +1,372 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Zakaz Panel{% endblock %}</title>
+
+    <!-- Design System tokens (Manrope font + CSS variables) -->
+    <link href="{% static 'ds/styles.css' %}" rel="stylesheet">
+
+    <!-- Bootstrap 5.3 (grid, utilities, components) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Lucide icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+    <style>
+        /* ── Layout ── */
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-app);
+            color: var(--text-body);
+        }
+
+        /* ── Topbar ── */
+        .zp-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: var(--topbar-height);
+            background: var(--surface-topbar);
+            display: flex;
+            align-items: center;
+            padding: 0 var(--space-6);
+            gap: var(--space-4);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .zp-topbar .brand {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            color: var(--text-on-dark);
+            font-weight: var(--weight-bold);
+            font-size: var(--text-md);
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        .zp-topbar .brand img { width: 28px; height: 28px; }
+        .zp-topbar .spacer { flex: 1; }
+        .zp-topbar .user-info {
+            color: var(--text-on-dark-muted);
+            font-size: var(--text-sm);
+        }
+        .zp-topbar .btn-logout {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--text-on-dark);
+            font-size: var(--text-sm);
+            padding: 5px 14px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background var(--duration-fast) var(--ease-standard);
+        }
+        .zp-topbar .btn-logout:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        /* ── Shell ── */
+        .zp-shell {
+            display: flex;
+            min-height: calc(100vh - var(--topbar-height));
+        }
+
+        /* ── Sidebar ── */
+        .zp-sidebar {
+            width: var(--sidebar-width);
+            flex-shrink: 0;
+            background: var(--surface-sidebar);
+            padding: var(--space-4) 0;
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        .zp-sidebar .nav-section {
+            padding: var(--space-3) var(--space-4) var(--space-1);
+            font-size: var(--text-xs);
+            font-weight: var(--weight-bold);
+            letter-spacing: var(--tracking-wide);
+            text-transform: uppercase;
+            color: var(--text-on-dark-muted);
+        }
+        .zp-sidebar .nav-link {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: 9px var(--space-5);
+            color: var(--text-on-dark-muted);
+            font-size: var(--text-sm);
+            font-weight: var(--weight-medium);
+            border-left: 3px solid transparent;
+            transition: all var(--duration-fast) var(--ease-standard);
+            text-decoration: none;
+        }
+        .zp-sidebar .nav-link:hover {
+            background: var(--surface-sidebar-hover);
+            color: var(--text-on-dark);
+        }
+        .zp-sidebar .nav-link.active {
+            background: var(--surface-sidebar-hover);
+            color: var(--text-on-dark);
+            border-left-color: var(--sidebar-active-bar);
+        }
+        .zp-sidebar .nav-link svg {
+            width: 16px; height: 16px;
+            flex-shrink: 0;
+            opacity: 0.7;
+        }
+        .zp-sidebar .nav-link.active svg,
+        .zp-sidebar .nav-link:hover svg { opacity: 1; }
+        .zp-sidebar .nav-divider {
+            border-color: rgba(255,255,255,0.08);
+            margin: var(--space-3) var(--space-4);
+        }
+        .zp-sidebar .nav-spacer { flex: 1; }
+
+        /* ── Main content ── */
+        .zp-main {
+            flex: 1;
+            padding: var(--space-6) var(--space-8);
+            overflow-y: auto;
+            min-width: 0;
+        }
+
+        /* ── Card override (match DS tokens) ── */
+        .card {
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+        }
+        .card-header {
+            background: var(--surface-card);
+            border-bottom: 1px solid var(--border-subtle);
+            font-weight: var(--weight-semibold);
+            color: var(--text-strong);
+        }
+
+        /* ── Table override ── */
+        .table { font-size: var(--text-sm); }
+        .table th {
+            font-size: var(--text-xs);
+            font-weight: var(--weight-bold);
+            letter-spacing: var(--tracking-wide);
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+        .table td, .table th { vertical-align: middle; }
+
+        /* ── Badge override ── */
+        .badge { font-weight: var(--weight-semibold); letter-spacing: 0.01em; }
+
+        /* ── Hamburger tugma (faqat mobile) ── */
+        .zp-burger {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: var(--radius-sm);
+            color: var(--text-on-dark);
+            cursor: pointer;
+            flex-shrink: 0;
+            padding: 0;
+        }
+        .zp-burger svg { width: 20px; height: 20px; }
+
+        /* ── Sidebar backdrop (qorong'i fon) ── */
+        .zp-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 499;
+            opacity: 0;
+            transition: opacity 0.25s var(--ease-standard);
+        }
+        .zp-backdrop.open { opacity: 1; }
+
+        /* ── Mobile (telefon) ── */
+        @media (max-width: 640px) {
+            .zp-burger { display: inline-flex; }
+
+            /* Sidebar — overlay sifatida chiqadi */
+            .zp-sidebar {
+                display: flex;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 280px;
+                height: 100vh;
+                z-index: 500;
+                transform: translateX(-100%);
+                transition: transform 0.25s var(--ease-standard);
+                box-shadow: var(--shadow-lg);
+            }
+            .zp-sidebar.open { transform: translateX(0); }
+
+            .zp-main {
+                margin: 0;
+                padding: 12px 12px;
+            }
+            .zp-topbar { padding: 0 var(--space-4); }
+            .zp-topbar .user-info { display: none; }
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- Topbar -->
+<header class="zp-topbar">
+    <button type="button" class="zp-burger" id="zpBurger" aria-label="Menyu">
+        <svg data-lucide="menu"></svg>
+    </button>
+    <a href="/" class="brand">
+        <img src="{% static 'ds/assets/mark.svg' %}" alt="Zakaz Panel">
+        Zakaz Panel
+    </a>
+    <div class="spacer"></div>
+    {% if user.is_authenticated %}
+        <span class="user-info">{{ user.username }}</span>
+        <form action="{% url 'logout' %}" method="post" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn-logout">Chiqish</button>
+        </form>
+    {% endif %}
+</header>
+
+<!-- Sidebar backdrop (mobile overlay foni) -->
+<div class="zp-backdrop" id="zpBackdrop"></div>
+
+<!-- Shell: sidebar + main -->
+<div class="zp-shell">
+
+    <!-- Sidebar -->
+    <nav class="zp-sidebar" id="zpSidebar">
+        <span class="nav-section">Asosiy</span>
+
+        <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="/">
+            <svg data-lucide="layout-dashboard"></svg> Dashboard
+        </a>
+        <a class="nav-link {% if 'obr' in request.path %}active{% endif %}" href="/obr/">
+            <svg data-lucide="package"></svg> Asosiy Zakaz
+        </a>
+
+        <span class="nav-section">Tahlil</span>
+
+        <a class="nav-link {% if 'supplier' in request.path %}active{% endif %}" href="/supplier/">
+            <svg data-lucide="users"></svg> Supplier
+        </a>
+        <a class="nav-link {% if 'analytics' in request.path %}active{% endif %}" href="/analytics/">
+            <svg data-lucide="bar-chart-2"></svg> Statistika
+        </a>
+        <a class="nav-link {% if 'stock' in request.path %}active{% endif %}" href="/stock/">
+            <svg data-lucide="archive"></svg> Qoldiqlar
+        </a>
+        <a class="nav-link {% if 'olik' in request.path %}active{% endif %}" href="/olik/">
+            <svg data-lucide="archive-x"></svg> O'lik Tovarlar
+        </a>
+
+        <span class="nav-section">Tizim</span>
+
+        <a class="nav-link {% if 'settings' in request.path %}active{% endif %}" href="/settings/">
+            <svg data-lucide="settings"></svg> Sozlamalar
+        </a>
+
+        <div class="nav-spacer"></div>
+        <hr class="nav-divider">
+
+        <form action="{% url 'logout' %}" method="post" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="nav-link btn btn-link text-start w-100 p-0 border-0">
+                <svg data-lucide="log-out"></svg> Chiqish
+            </button>
+        </form>
+    </nav>
+
+    <!-- Main content -->
+    <main class="zp-main">
+        {% block content %}{% endblock %}
+    </main>
+
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Lucide icons init -->
+<script>lucide.createIcons();</script>
+
+<!-- Mobile sidebar toggle -->
+<script>
+(function () {
+    var burger   = document.getElementById('zpBurger');
+    var sidebar  = document.getElementById('zpSidebar');
+    var backdrop = document.getElementById('zpBackdrop');
+    if (!burger || !sidebar || !backdrop) return;
+
+    function openMenu() {
+        sidebar.classList.add('open');
+        backdrop.style.display = 'block';
+        // reflow → smooth fade-in
+        requestAnimationFrame(function () { backdrop.classList.add('open'); });
+    }
+    function closeMenu() {
+        sidebar.classList.remove('open');
+        backdrop.classList.remove('open');
+        setTimeout(function () { backdrop.style.display = 'none'; }, 250);
+    }
+
+    burger.addEventListener('click', function () {
+        if (sidebar.classList.contains('open')) closeMenu(); else openMenu();
+    });
+    backdrop.addEventListener('click', closeMenu);
+    // Sidebar ichidagi havola bosilganda yopilsin
+    sidebar.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', closeMenu);
+    });
+})();
+</script>
+
+<!-- Accordion: ds-card-header bosib jadval/kontent yashirish/ochish -->
+<script>
+(function () {
+    document.querySelectorAll('.ds-card-header').forEach(function (header) {
+        var chevron = document.createElement('span');
+        chevron.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+        chevron.style.cssText = 'margin-left:auto;flex-shrink:0;transition:transform 0.2s;opacity:0.5;display:flex;align-items:center;';
+        header.appendChild(chevron);
+        header.style.cursor = 'pointer';
+        header.style.userSelect = 'none';
+
+        var body = header.nextElementSibling;
+        if (!body) return;
+
+        var collapsed = false;
+
+        header.addEventListener('click', function () {
+            collapsed = !collapsed;
+            if (collapsed) {
+                body.style.display = 'none';
+                chevron.style.transform = 'rotate(-90deg)';
+            } else {
+                body.style.display = '';
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        });
+    });
+})();
+</script>
+
+{% block extra_js %}{% endblock %}
+
+</body>
+</html>

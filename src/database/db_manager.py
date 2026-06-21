@@ -4,6 +4,7 @@ import io
 from sqlalchemy import text, create_engine, event, func
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.pool import NullPool
 import config
 from .models import Base, InvitedUser, Supplier, AllowedUser, Admin, Setting, GeneratedOrder, SupplierNameHistory, BlockedUser
 
@@ -11,14 +12,18 @@ from .models import Base, InvitedUser, Supplier, AllowedUser, Admin, Setting, Ge
 TASHKENT_TZ = timezone(timedelta(hours=5))
 
 # --- DB SESSIYASI ---
-engine = create_engine(config.POSTGRES_URL, connect_args={"check_same_thread": False})
+# NullPool: har bir so'rovdan keyin connection yopiladi, RAM tejash uchun
+_is_sqlite = config.POSTGRES_URL.startswith("sqlite")
+_connect_args = {"check_same_thread": False} if _is_sqlite else {}
+engine = create_engine(config.POSTGRES_URL, connect_args=_connect_args, poolclass=NullPool)
 
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA synchronous=NORMAL")
-    cursor.close()
+if _is_sqlite:
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
 
 Session = sessionmaker(bind=engine)
 # --- FUNKSIYALAR ---
@@ -27,25 +32,27 @@ def init_db():
     try:
         Base.metadata.create_all(engine)
         session = Session()
-        if session.query(Setting).count() == 0:
-            print("⚙️ Standart sozlamalar kiritilmoqda...")
-            defaults = [
-                Setting(rule_name='m1_min_days', rule_value=16.0),
-                Setting(rule_name='m1_max_days', rule_value=20.0),
-                Setting(rule_name='m1_percentage', rule_value=80.0),
-                Setting(rule_name='m2_min_days', rule_value=11.0),
-                Setting(rule_name='m2_max_days', rule_value=15.0),
-                Setting(rule_name='m2_percentage', rule_value=70.0),
-                Setting(rule_name='m3_min_days', rule_value=6.0),
-                Setting(rule_name='m3_max_days', rule_value=10.0),
-                Setting(rule_name='m3_percentage', rule_value=60.0),
-                Setting(rule_name='m4_min_days', rule_value=1.0),
-                Setting(rule_name='m4_max_days', rule_value=5.0),
-                Setting(rule_name='m4_percentage', rule_value=30.0),
-            ]
-            session.add_all(defaults)
-            session.commit()
-        session.close()
+        try:
+            if session.query(Setting).count() == 0:
+                print("⚙️ Standart sozlamalar kiritilmoqda...")
+                defaults = [
+                    Setting(rule_name='m1_min_days', rule_value=16.0),
+                    Setting(rule_name='m1_max_days', rule_value=20.0),
+                    Setting(rule_name='m1_percentage', rule_value=80.0),
+                    Setting(rule_name='m2_min_days', rule_value=11.0),
+                    Setting(rule_name='m2_max_days', rule_value=15.0),
+                    Setting(rule_name='m2_percentage', rule_value=70.0),
+                    Setting(rule_name='m3_min_days', rule_value=6.0),
+                    Setting(rule_name='m3_max_days', rule_value=10.0),
+                    Setting(rule_name='m3_percentage', rule_value=60.0),
+                    Setting(rule_name='m4_min_days', rule_value=1.0),
+                    Setting(rule_name='m4_max_days', rule_value=5.0),
+                    Setting(rule_name='m4_percentage', rule_value=30.0),
+                ]
+                session.add_all(defaults)
+                session.commit()
+        finally:
+            session.close()
 
         # --- JINS (ПОЛ) USTUNINI QOLDIQ JADVALIGA QO'SHISH ---
         try:
@@ -53,7 +60,23 @@ def init_db():
                 conn.execute(text('ALTER TABLE f_qoldiqlar ADD COLUMN "Пол" TEXT'))
         except Exception:
             pass # Agar allaqachon bor bo'lsa indamaydi
-            
+
+        # --- generated_orders ga product_id USTUNINI QO'SHISH (migration) ---
+        # Eski bazalarda bu ustun bo'lmaydi. create_all yangi jadvalda yaratadi,
+        # lekin mavjud jadvalga ustun qo'shmaydi — shuning uchun ALTER TABLE shart.
+        # Agar ustun allaqachon mavjud bo'lsa, ALTER xato beradi va except yutadi.
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE generated_orders ADD COLUMN "product_id" TEXT'))
+        except Exception:
+            pass
+
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE d_mahsulotlar ADD COLUMN promo_price REAL'))
+        except Exception:
+            pass
+
         print("✅ Baza to'liq tayyor.")
     except Exception as e:
         print(f"❌ Bazani yaratishda xatolik: {e}")
@@ -348,37 +371,6 @@ def get_unassigned_suppliers_by_filter(category: str, subcategory: str) -> list[
 
 
 
-def get_supplier_stats_detailed(telegram_id: int):
-    """
-    Yetkazib beruvchi uchun: Kategoriya va Podkategoriya bo'yicha pochkalarni hisoblaydi.
-    """
-    session = Session()
-    try:
-        # 1. Yetkazib beruvchi nomini aniqlaymiz
-        supplier = session.query(Supplier).filter_by(telegram_id=telegram_id).first()
-        if not supplier:
-            return []
-
-        # 2. Faqat shu odamga tegishli zakazlarni guruhlab olamiz
-        results = session.query(
-            GeneratedOrder.category,
-            GeneratedOrder.subcategory,
-            func.sum(GeneratedOrder.quantity)
-        ).filter(
-            GeneratedOrder.supplier == supplier.name,
-            GeneratedOrder.status == 'Kutilmoqda'
-        ).group_by(
-            GeneratedOrder.category,
-            GeneratedOrder.subcategory
-        ).all()
-        
-        return results # Qaytaradi: [('Shim', 'Jinsi', 5), ('Shim', 'Slaks', 3)...]
-    finally:
-        session.close()
-
-
-
-
 # --- ADMIN STATISTIKASI UCHUN YANGI FUNKSIYALAR ---
 
 def get_supplier_stats_detailed(telegram_id: int):
@@ -501,13 +493,13 @@ def get_import_orders_detailed(min_day, max_day, category, subcategory):
 def set_global_lock(is_locked: bool):
     """True = Yopish, False = Ochish"""
     val = 1.0 if is_locked else 0.0
-    # update_setting funksiyasi bor edi, shundan foydalanamiz
     if not update_setting('global_lock', val):
-        # Agar yo'q bo'lsa yangi yaratamiz
         session = Session()
-        session.add(Setting(rule_name='global_lock', rule_value=val))
-        session.commit()
-        session.close()
+        try:
+            session.add(Setting(rule_name='global_lock', rule_value=val))
+            session.commit()
+        finally:
+            session.close()
 
 def is_global_locked() -> bool:
     settings = get_all_settings()
@@ -593,148 +585,7 @@ def get_stock_report_by_date(target_date: str) -> tuple[dict, dict]:
     finally:
         session.close()
 
-def get_stats_by_import_days(min_day, max_day, category=None):
-    """
-    Kun oralig'i bo'yicha GLOBAL qidiruv.
-    """
-    session = Session()
-    try:
-        query = session.query(GeneratedOrder).filter(
-            GeneratedOrder.status == 'Kutilmoqda',
-            GeneratedOrder.days_passed >= min_day,
-            GeneratedOrder.days_passed <= max_day
-        )
 
-        if category is None:
-            results = query.with_entities(GeneratedOrder.category).distinct().all()
-        else:
-            results = query.filter(GeneratedOrder.category == category).with_entities(GeneratedOrder.subcategory).distinct().all()
-
-        return sorted([r[0] for r in results if r[0]])
-    finally:
-        session.close()
-
-def get_stock_categories_on_date(target_date: str) -> list[str]:
-    """Tanlangan sanadagi barcha unikal Kategoriyalarni qaytaradi"""
-    session = Session()
-    try:
-        query = text('''
-            SELECT DISTINCT "Категория"
-            FROM f_qoldiqlar        
-            WHERE date("Дата") = :target_date
-        ''')
-        results = session.execute(query, {"target_date": target_date}).fetchall()
-        return sorted([r[0] for r in results if r[0]])
-    except Exception as e:
-        print(f"Kategoriyalarni olishda xato: {e}")
-        return []
-    finally:
-        session.close()
-
-def get_stock_subcategories_summary_v2(category: str, target_date: str) -> tuple[list[tuple[str, str, float]], list[tuple[str, str, float]]]:        
-    """Tanlangan sana va kategoriya bo'yicha qoldiqlarni jinsi bilan birga qaytaradi"""
-    session = Session()
-    try:
-        query_asosiy = text('''     
-            SELECT "Подкатегория",  "Пол", SUM("Кол-во") as total_qty
-            FROM f_qoldiqlar        
-            WHERE "Категория" = :category
-              AND date("Дата") = :target_date
-              AND "Артикул" NOT LIKE '010%'
-              AND "Артикул" NOT LIKE '011%'
-            GROUP BY "Подкатегория", "Пол"
-            ORDER BY total_qty DESC 
-        ''')
-
-        query_aksiya = text('''     
-            SELECT "Подкатегория",  "Пол", SUM("Кол-во") as total_qty
-            FROM f_qoldiqlar        
-            WHERE "Категория" = :category
-              AND date("Дата") = :target_date
-              AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
-            GROUP BY "Подкатегория", "Пол"
-            ORDER BY total_qty DESC 
-        ''')
-
-        res_asosiy = session.execute(query_asosiy, {"category": category, "target_date": target_date}).fetchall()
-        res_aksiya = session.execute(query_aksiya, {"category": category, "target_date": target_date}).fetchall()
-
-        def process_rows(rows):     
-            merged = {}
-            for r in rows:
-                sub = str(r[0] or "").strip()
-                if not sub:
-                    sub = "Boshqa"  
-                gender = str(r[1] or "Универсал").strip()
-                qty = float(r[2] or 0)
-
-                key = (sub, gender) 
-                merged[key] = merged.get(key, 0.0) + qty
-
-            sorted_list = [(k[0], k[1], v) for k, v in merged.items()]
-            return sorted(sorted_list, key=lambda x: x[2], reverse=True)
-
-        list_asosiy = process_rows(res_asosiy)
-        list_aksiya = process_rows(res_aksiya)
-
-        return list_asosiy, list_aksiya
-    except Exception as e:
-        print(f"Qoldiq tahlili hisoblashda xato: {e}")
-        return [], []
-    finally:
-        session.close()
-
-def get_all_stock_summary_for_excel(target_date: str) -> tuple[pd.DataFrame, pd.DataFrame, str]:
-    """Tanlangan sana bo'yicha barcha qoldiqlarni Excel uchun tayyorlaydi"""
-    session = Session()
-    try:
-        query_asosiy_raw = text(''' 
-            SELECT
-                "Подкатегория",     
-                "Категория",        
-                "Пол",
-                "Кол-во"
-            FROM f_qoldiqlar        
-            WHERE date("Дата") = :target_date
-              AND "Артикул" NOT LIKE '010%'
-              AND "Артикул" NOT LIKE '011%'
-        ''')
-
-        query_aksiya_raw = text(''' 
-            SELECT
-                "Подкатегория",     
-                "Категория",        
-                "Пол",
-                "Кол-во"
-            FROM f_qoldiqlar        
-            WHERE date("Дата") = :target_date
-              AND ("Артикул" LIKE '010%' OR "Артикул" LIKE '011%')
-        ''')
-
-        df_raw_asosiy = pd.read_sql(query_asosiy_raw, engine, params={"target_date": target_date})
-        df_raw_aksiya = pd.read_sql(query_aksiya_raw, engine, params={"target_date": target_date})
-
-        def clean_and_aggregate(df):
-            if df.empty:
-                return pd.DataFrame(columns=["Подкатегория", "Категория", "Пол", "Қолдиқ (дона)"])
-
-            df['Подкатегория'] = df['Подкатегория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
-            df['Категория'] = df['Категория'].fillna('Boshqa').astype(str).str.strip().replace('', 'Boshqa')
-            df['Пол'] = df['Пол'].fillna('Универсал').astype(str).str.strip().replace('', 'Универсал')
-
-            agg_df = df.groupby(['Подкатегория', 'Категория', 'Пол'], as_index=False)['Кол-во'].sum()
-            agg_df.rename(columns={'Кол-во': 'Қолдиқ (дона)'}, inplace=True)
-            return agg_df.sort_values(by=["Подкатегория", "Категория", "Пол"])
-
-        df_asosiy = clean_and_aggregate(df_raw_asosiy)
-        df_aksiya = clean_and_aggregate(df_raw_aksiya)
-
-        return df_asosiy, df_aksiya, target_date
-    except Exception as e:
-        print(f"Excel hisobot hisoblashda xato: {e}")
-        return pd.DataFrame(), pd.DataFrame(), target_date
-    finally:
-        session.close()
 
 def get_max_stock_date_str() -> str:
     """f_qoldiqlar jadvalidagi eng oxirgi sanani aniqlaydi"""
@@ -1113,6 +964,110 @@ def add_admin_db(telegram_id: int) -> bool:
     finally:
         session.close()
 
+# --- BOT ORQALI MAHSULOT MA'LUMOTLARINI TAHRIRLASH ---
+
+# Adminga qaysi ustunlarni tahrirlashga ruxsat berilgan (SQL injection oldini olish uchun WHITELIST).
+# Diqqat: generated_orders.color kiritilmagan — aktiv zakazlar bilan bog'lanish uziladi.
+ALLOWED_EDIT_FIELDS = {"Категория", "Подкатегория", "Вид", "Материал", "Пол", "Сезон"}
+
+# Qaysi jadvalda qaysi ustun mavjudligini ko'rsatadi (kontent jadvallari).
+# Agar Billz API'dan keladigan schema o'zgarsa — bu xaritani yangilash kerak.
+_EDITABLE_TABLES_COLUMNS = {
+    "d_mahsulotlar": {"Категория", "Подкатегория", "Вид", "Материал", "Пол", "Сезон"},
+    "f_sotuvlar":    {"Категория", "Подкатегория", "Вид", "Материал"},
+    "f_qoldiqlar":   {"Категория", "Подкатегория", "Вид", "Материал", "Пол"},
+}
+
+
+def get_product_by_artikul(artikul: str) -> dict | None:
+    """
+    d_mahsulotlar dan berilgan artikul bo'yicha BIRINCHI mos satrni dict
+    ko'rinishida qaytaradi (Naimenovanie, Категория va boshqa kerakli ustunlar).
+    Bir artikul ostida bir nechta satr bo'lishi mumkin (turli rang/o'lcham) —
+    biz ko'rsatish uchun bittasini olamiz, lekin update hamma satrlarda ishlaydi.
+
+    Qaytaradi: dict (ustun_nomi -> qiymat) yoki None — agar topilmasa.
+    """
+    if not artikul:
+        return None
+    artikul_clean = artikul.strip()
+    if not artikul_clean:
+        return None
+
+    session = Session()
+    try:
+        query = text(
+            'SELECT "Артикул", "Наименование", "Категория", "Подкатегория", '
+            '"Вид", "Материал", "Пол", "Сезон" '
+            'FROM d_mahsulotlar WHERE "Артикул" = :artikul LIMIT 1'
+        )
+        row = session.execute(query, {"artikul": artikul_clean}).fetchone()
+        if not row:
+            return None
+        return {
+            "Артикул": row[0],
+            "Наименование": row[1],
+            "Категория": row[2],
+            "Подкатегория": row[3],
+            "Вид": row[4],
+            "Материал": row[5],
+            "Пол": row[6],
+            "Сезон": row[7],
+        }
+    except Exception as e:
+        print(f"ERR get_product_by_artikul: {e}")
+        return None
+    finally:
+        session.close()
+
+
+def update_product_field(artikul: str, field: str, new_value: str) -> int:
+    """
+    Berilgan artikul uchun BARCHA satrlarda (d_mahsulotlar + f_sotuvlar + f_qoldiqlar
+    da, agar ustun mavjud bo'lsa) belgilangan field qiymatini yangilaydi.
+
+    Args:
+        artikul: tahrirlanadigan mahsulot artikuli (string)
+        field: ustun nomi — faqat ALLOWED_EDIT_FIELDS ichida bo'lishi shart
+        new_value: yangi qiymat (oldindan trim/normalize qilingan bo'lishi tavsiya etiladi)
+
+    Qaytaradi: ta'sirlangan satrlar umumiy soni (barcha jadvallar bo'yicha).
+    Agar field whitelist'da bo'lmasa — ValueError ko'tariladi (xavfsizlik).
+    """
+    if field not in ALLOWED_EDIT_FIELDS:
+        raise ValueError(f"Ruxsat etilmagan field: {field!r}")
+
+    if not artikul:
+        return 0
+    artikul_clean = artikul.strip()
+    if not artikul_clean:
+        return 0
+
+    total_affected = 0
+    # SQLAlchemy bilan engine.begin() ichida — barcha UPDATE bir tranzaksiyada
+    try:
+        with engine.begin() as conn:
+            for table_name, cols in _EDITABLE_TABLES_COLUMNS.items():
+                if field not in cols:
+                    continue
+                # SQL injection xavfsizligi:
+                #   - table_name xardkod dict'dan keladi (foydalanuvchidan emas)
+                #   - field oldin ALLOWED_EDIT_FIELDS bilan tekshirilgan
+                #   - artikul va new_value param sifatida uzatiladi (bind)
+                sql = text(
+                    f'UPDATE "{table_name}" '
+                    f'SET "{field}" = :new_value '
+                    f'WHERE "Артикул" = :artikul'
+                )
+                result = conn.execute(sql, {"new_value": new_value, "artikul": artikul_clean})
+                total_affected += result.rowcount or 0
+    except Exception as e:
+        print(f"ERR update_product_field [{field}={new_value!r} for {artikul_clean!r}]: {e}")
+        return 0
+
+    return total_affected
+
+
 def remove_admin_db(telegram_id: int) -> bool:
     """Adminni bazadan xavfsiz o'chiradi"""
     session = Session()
@@ -1185,4 +1140,93 @@ def get_supplier_sales_report(supplier_name: str) -> tuple:
             session.close()
     except Exception as e:
         print(f"❌ Supplier hisobotida xatolik: {e}")
+        return {}, {}, "", ""
+
+
+def get_all_suppliers_stats() -> pd.DataFrame:
+    """
+    Barcha supplierlar uchun oy boshidan beri statistika:
+    sotildi, summa, foyda, artikul soni, qoldiq.
+    """
+    try:
+        now = datetime.now(TASHKENT_TZ).replace(tzinfo=None)
+        oy_boshi = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).strftime('%Y-%m-%d')
+
+        sotuv_df = pd.read_sql(text('''
+            SELECT
+                d."Поставщик"                                     AS supplier,
+                COUNT(DISTINCT s."Артикул")                       AS artikul_count,
+                SUM(s."Продано за вычетом возвратов")             AS sotildi,
+                SUM(s."Продажи со скидкой с учетом возвратов")    AS summa,
+                SUM(s."Валовая прибыль")                          AS foyda
+            FROM f_sotuvlar s
+            JOIN d_mahsulotlar d ON s.product_id = d.product_id
+            WHERE d."Поставщик" IS NOT NULL
+              AND d."Поставщик" != ''
+              AND date(s."Дата") >= :oy_boshi
+              AND s."Артикул" NOT LIKE '010%'
+              AND s."Артикул" NOT LIKE '011%'
+              AND s."Наименование" NOT LIKE 'Пакет%'
+            GROUP BY d."Поставщик"
+        '''), engine, params={'oy_boshi': oy_boshi})
+
+        # Katalogdagi jami artikul soni (qoldiq uchun)
+        qoldiq_df = pd.read_sql(text('''
+            SELECT
+                d."Поставщик"   AS supplier,
+                SUM(q."Кол-во") AS qoldiq
+            FROM f_qoldiqlar q
+            JOIN d_mahsulotlar d ON q.product_id = d.product_id
+            WHERE d."Поставщик" IS NOT NULL
+              AND d."Поставщик" != ''
+              AND date(q."Дата") = (SELECT MAX(date("Дата")) FROM f_qoldiqlar)
+              AND q."Артикул" NOT LIKE '010%'
+              AND q."Артикул" NOT LIKE '011%'
+            GROUP BY d."Поставщик"
+        '''), engine)
+
+        if sotuv_df.empty:
+            return pd.DataFrame(columns=['supplier','artikul_count','sotildi','summa','foyda','qoldiq'])
+
+        merged = pd.merge(sotuv_df, qoldiq_df, on='supplier', how='left')
+        for col in ['sotildi','summa','foyda','qoldiq']:
+            merged[col] = pd.to_numeric(merged[col], errors='coerce').fillna(0)
+        merged = merged.sort_values('foyda', ascending=False).reset_index(drop=True)
+        return merged
+
+    except Exception as e:
+        print(f"get_all_suppliers_stats xatolik: {e}")
+        return pd.DataFrame()
+
+
+def get_supplier_daily_chart(supplier_name: str) -> dict:
+    """Supplier uchun kunlik sotuv va qoldiq (oxirgi 30 kun)."""
+    try:
+        now = datetime.now(TASHKENT_TZ).replace(tzinfo=None)
+        oy_boshi = (now - __import__('datetime').timedelta(days=30)).strftime('%Y-%m-%d')
+
+        sotuv = pd.read_sql(text('''
+            SELECT date(s."Дата") as kun,
+                   SUM(s."Продано за вычетом возвратов") as sotildi,
+                   SUM(s."Валовая прибыль") as foyda
+            FROM f_sotuvlar s
+            JOIN d_mahsulotlar d ON s.product_id = d.product_id
+            WHERE d."Поставщик" LIKE :sup
+              AND date(s."Дата") >= :oy_boshi
+              AND s."Артикул" NOT LIKE '010%'
+              AND s."Артикул" NOT LIKE '011%'
+            GROUP BY kun ORDER BY kun
+        '''), engine, params={'sup': f'%{supplier_name}%', 'oy_boshi': oy_boshi})
+
+        if sotuv.empty:
+            return {}
+
+        return {
+            'labels': sotuv['kun'].tolist(),
+            'sotildi': [round(float(v), 0) for v in sotuv['sotildi']],
+            'foyda':   [round(float(v), 0) for v in sotuv['foyda']],
+        }
+    except Exception as e:
+        print(f"get_supplier_daily_chart xatolik: {e}")
+        return {}
         return {}, {}, "", ""

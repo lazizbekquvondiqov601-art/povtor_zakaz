@@ -20,5 +20,7 @@ Ushbu loyiha Billz API orqali kiyim-kechak do'konlari uchun avtomatik zakaz (OBR
 ## 🔄 Oxirgi O'zgarishlar (Iyun 2026)
 - Loyiha to'liq modullashtirildi (restructuring).
 - Baza sinxronizatsiyasidagi xatoliklar (missing products) tuzatildi.
-- Supplier qidiruv tizimi buyruqlarni e'tiborsiz qoldiradigan qilib optimallashtirildi.
+- **MUHIM:** `import_date` endi API dan `custom_fields` ichidagi "Дата" maydonidan harf-sana formatida (`M-15.05.2026`) olinadi.
+- **MUHIM:** Missing mahsulotlar `product_id` bo'yicha guruhlanib, sanasi `Дата2` dan tiklanadi. Prefikslarni o'chirmang.
+- Supplier qidiruv tizimi optimallashtirildi.
 - Super Admin interfeysi UX/UI jihatdan yaxshilandi.

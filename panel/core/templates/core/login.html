@@ -1,0 +1,532 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kirish — Zakaz Panel</title>
+    <link href="{% static 'ds/styles.css' %}" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-sans);
+            display: flex;
+            min-height: 100vh;
+            background: var(--slate-50);
+        }
+
+        /* ─────────────────────────────────────────
+           CHAP PANEL
+        ───────────────────────────────────────── */
+        .lp-left {
+            width: 50%;
+            background: var(--navy-950);
+            display: flex;
+            flex-direction: column;
+            padding: 48px 56px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Fon dekoratsiya — yoritilgan doira */
+        .lp-left::before {
+            content: '';
+            position: absolute;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%);
+            top: -100px;
+            right: -150px;
+            pointer-events: none;
+        }
+        .lp-left::after {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%);
+            bottom: 80px;
+            left: -80px;
+            pointer-events: none;
+        }
+
+        /* Logo qatori */
+        .lp-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        .lp-mark {
+            width: 40px;
+            height: 40px;
+        }
+        .lp-brand-name {
+            font-size: 1.125rem;
+            font-weight: var(--weight-bold);
+            color: var(--white);
+            letter-spacing: -0.01em;
+        }
+
+        /* Asosiy kontent — markazda */
+        .lp-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+            padding: 48px 0 24px;
+        }
+
+        /* Tag pill */
+        .lp-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 14px;
+            background: rgba(59,130,246,0.15);
+            border: 1px solid rgba(59,130,246,0.30);
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: var(--weight-bold);
+            color: #93c5fd;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+            width: fit-content;
+        }
+
+        .lp-title {
+            font-size: 2.6rem;
+            font-weight: 900;
+            color: var(--white);
+            line-height: 1.12;
+            letter-spacing: -0.03em;
+            margin-bottom: 18px;
+        }
+        .lp-title span {
+            color: #60a5fa;
+        }
+
+        .lp-desc {
+            font-size: 0.9375rem;
+            color: rgba(255,255,255,0.50);
+            line-height: 1.7;
+            max-width: 340px;
+            margin-bottom: 40px;
+        }
+
+        /* Feature bullets */
+        .lp-features {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .lp-features li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.875rem;
+            color: rgba(255,255,255,0.60);
+        }
+        .lp-feat-dot {
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .lp-feat-dot svg { width: 14px; height: 14px; }
+
+        /* Pastki stat qatori */
+        .lp-stats {
+            display: flex;
+            gap: 32px;
+            padding-top: 40px;
+            margin-top: auto;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            position: relative;
+            z-index: 1;
+        }
+        .lp-stat-val {
+            font-family: var(--font-mono);
+            font-size: 1.25rem;
+            font-weight: var(--weight-bold);
+            color: var(--white);
+        }
+        .lp-stat-lbl {
+            font-size: 11px;
+            color: rgba(255,255,255,0.35);
+            margin-top: 2px;
+            letter-spacing: 0.04em;
+        }
+
+        /* ─────────────────────────────────────────
+           O'NG PANEL — LOGIN FORMA
+        ───────────────────────────────────────── */
+        .lp-right {
+            width: 50%;
+            background: var(--slate-50);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 40px;
+        }
+        .lp-form-wrap {
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .lp-form-title {
+            font-size: var(--text-2xl);
+            font-weight: var(--weight-bold);
+            color: var(--text-strong);
+            margin-bottom: 6px;
+            letter-spacing: -0.01em;
+        }
+        .lp-form-sub {
+            font-size: var(--text-sm);
+            color: var(--text-muted);
+            margin-bottom: 36px;
+        }
+
+        .field { margin-bottom: 20px; }
+        .field-label {
+            display: block;
+            font-size: var(--text-sm);
+            font-weight: var(--weight-semibold);
+            color: var(--text-body);
+            margin-bottom: 8px;
+        }
+        .field-input-wrap { position: relative; }
+        .field-input-wrap svg {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--slate-400);
+            pointer-events: none;
+        }
+        .field-input {
+            width: 100%;
+            padding: 11px 14px 11px 42px;
+            font-family: var(--font-sans);
+            font-size: var(--text-base);
+            color: var(--text-strong);
+            background: var(--white);
+            border: 1.5px solid var(--border-default);
+            border-radius: var(--radius-md);
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .field-input:focus {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-focus);
+        }
+        .field-input::placeholder { color: var(--slate-400); }
+
+        .lp-error {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--danger-soft);
+            color: var(--danger-text);
+            border: 1px solid var(--danger);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            font-size: var(--text-sm);
+            font-weight: var(--weight-medium);
+            margin-bottom: 20px;
+        }
+        .lp-error svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+        /* Parol ko'rsat/yashir tugmasi */
+        .pwd-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--slate-400);
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            transition: color 0.15s;
+        }
+        .pwd-toggle:hover { color: var(--text-body); }
+        .pwd-toggle svg { width: 16px; height: 16px; }
+        /* Parol inputi ko'z ikonka uchun joy */
+        .field-input.has-toggle { padding-right: 42px; }
+
+        .btn-kirish {
+            width: 100%;
+            padding: 13px;
+            background: var(--accent);
+            color: var(--white);
+            font-family: var(--font-sans);
+            font-size: var(--text-base);
+            font-weight: var(--weight-semibold);
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            margin-top: 8px;
+            letter-spacing: 0.01em;
+            transition: background 0.15s, transform 0.1s, opacity 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-kirish:hover  { background: var(--accent-hover); }
+        .btn-kirish:active { background: var(--accent-active); transform: scale(0.99); }
+        .btn-kirish:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+        .btn-kirish svg { width: 16px; height: 16px; }
+
+        /* Spinner */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+        .btn-kirish.loading .spinner { display: block; }
+        .btn-kirish.loading .btn-text { display: none; }
+
+        /* ─────────────────────────────────────────
+           RESPONSIVE
+        ───────────────────────────────────────── */
+
+        /* Tablet (768–1024px): chap toraf torroq */
+        @media (max-width: 1024px) {
+            .lp-left  { width: 45%; padding: 40px 40px; }
+            .lp-right { width: 55%; padding: 40px 32px; }
+            .lp-title { font-size: 2.1rem; }
+            .lp-stats { gap: 20px; }
+        }
+
+        /* Mobile (< 768px): chap panel yashiriladi, forma to'liq ekran */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+
+            .lp-left {
+                width: 100%;
+                padding: 28px 24px;
+                flex: none;
+            }
+            /* Mobileda content pastga tushmasin — gorizontal qator */
+            .lp-content {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0;
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+            /* Mobilda faqat tag va sarlavha qolsin */
+            .lp-tag { margin-bottom: 0; }
+            .lp-title { font-size: 1.5rem; margin-bottom: 0; }
+            .lp-desc   { display: none; }
+            .lp-features { display: none; }
+            .lp-stats  { display: none; }
+            .lp-left::before, .lp-left::after { display: none; }
+
+            .lp-right {
+                width: 100%;
+                flex: 1;
+                padding: 32px 24px;
+                align-items: flex-start;
+                padding-top: 40px;
+            }
+            .lp-form-wrap { max-width: 100%; }
+        }
+
+        /* Mobile (< 640px) — forma to'liq kenglik, padding kamaytirish */
+        @media (max-width: 640px) {
+            .lp-right { padding: 28px 16px; padding-top: 32px; }
+            .lp-form-wrap { max-width: 100%; }
+            .lp-form-title { font-size: var(--text-xl); }
+            .lp-form-sub { margin-bottom: 24px; }
+        }
+
+        /* Kichik mobil (< 480px) */
+        @media (max-width: 480px) {
+            .lp-left { padding: 20px 20px; }
+            .lp-title { font-size: 1.25rem; }
+            .lp-brand-name { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Chap: brend paneli ── -->
+<div class="lp-left">
+
+    <!-- Logo -->
+    <div class="lp-brand">
+        <img src="{% static 'ds/assets/mark.svg' %}" class="lp-mark" alt="Z">
+        <span class="lp-brand-name">Zakaz Panel</span>
+    </div>
+
+    <!-- Asosiy kontent -->
+    <div class="lp-content">
+
+        <div class="lp-tag">
+            <svg data-lucide="zap" style="width:10px;height:10px;"></svg>
+            Boshqaruv tizimi
+        </div>
+
+        <h1 class="lp-title">
+            Aqlli inventar<br>va <span>sotuv tahlili</span>
+        </h1>
+
+        <p class="lp-desc">
+            Sotuv, qoldiq va OBR ko'rsatkichlarini real vaqtda
+            kuzating. Supplierlar bilan ishlashni optimallang
+            va zakazlarni avtomatlashtiring.
+        </p>
+
+        <ul class="lp-features">
+            <li>
+                <div class="lp-feat-dot" style="background:rgba(59,130,246,0.15);">
+                    <svg data-lucide="bar-chart-2" style="color:#60a5fa;"></svg>
+                </div>
+                Sotuv tahlili, marja va OBR nazorati
+            </li>
+            <li>
+                <div class="lp-feat-dot" style="background:rgba(16,185,129,0.15);">
+                    <svg data-lucide="package" style="color:#34d399;"></svg>
+                </div>
+                Qoldiq monitoringi va o'lik tovarlar
+            </li>
+            <li>
+                <div class="lp-feat-dot" style="background:rgba(245,158,11,0.15);">
+                    <svg data-lucide="zap" style="color:#fbbf24;"></svg>
+                </div>
+                Shoshilinch zakazlar avtomatik aniqlash
+            </li>
+            <li>
+                <div class="lp-feat-dot" style="background:rgba(139,92,246,0.15);">
+                    <svg data-lucide="users" style="color:#a78bfa;"></svg>
+                </div>
+                Supplier reyting va monitoring
+            </li>
+        </ul>
+
+    </div>
+
+    <!-- Pastki statistika -->
+    <div class="lp-stats">
+        <div>
+            <div class="lp-stat-val">7 kun</div>
+            <div class="lp-stat-lbl">SOTUV TRENDI</div>
+        </div>
+        <div>
+            <div class="lp-stat-val">OBR%</div>
+            <div class="lp-stat-lbl">AYLANMA NAZORAT</div>
+        </div>
+        <div>
+            <div class="lp-stat-val">Real</div>
+            <div class="lp-stat-lbl">VAQT MA'LUMOT</div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── O'ng: login formasi ── -->
+<div class="lp-right">
+    <div class="lp-form-wrap">
+
+        <h2 class="lp-form-title">Tizimga kirish</h2>
+        <p class="lp-form-sub">Faqat tizim administratorlari uchun</p>
+
+        {% if form.errors %}
+        <div class="lp-error">
+            <svg data-lucide="alert-circle"></svg>
+            Login yoki parol noto'g'ri. Qayta urinib ko'ring.
+        </div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <div class="field">
+                <label class="field-label" for="id_username">Foydalanuvchi nomi</label>
+                <div class="field-input-wrap">
+                    <svg data-lucide="user"></svg>
+                    <input type="text" name="username" id="id_username"
+                           class="field-input" required autofocus placeholder="admin">
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="id_password">Parol</label>
+                <div class="field-input-wrap">
+                    <svg data-lucide="lock"></svg>
+                    <input type="password" name="password" id="id_password"
+                           class="field-input has-toggle" required placeholder="••••••••">
+                    <button type="button" class="pwd-toggle" id="pwdToggle" tabindex="-1" aria-label="Parolni ko'rsat">
+                        <svg data-lucide="eye" id="eyeIcon"></svg>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-kirish" id="btnKirish">
+                <div class="spinner"></div>
+                <span class="btn-text">
+                    <svg data-lucide="log-in" style="width:15px;height:15px;"></svg>
+                    Kirish
+                </span>
+            </button>
+        </form>
+
+    </div>
+</div>
+
+<script>
+lucide.createIcons();
+
+// Parol ko'rsat/yashir
+(function () {
+    var toggle = document.getElementById('pwdToggle');
+    var input  = document.getElementById('id_password');
+    if (!toggle || !input) return;
+    toggle.addEventListener('click', function () {
+        var show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        // Ikonka almashtirish
+        toggle.innerHTML = show
+            ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    });
+})();
+
+// Kirish tugmasi loading holati
+(function () {
+    var form = document.querySelector('form[method="post"]');
+    var btn  = document.getElementById('btnKirish');
+    if (!form || !btn) return;
+    form.addEventListener('submit', function () {
+        btn.classList.add('loading');
+        btn.disabled = true;
+    });
+})();
+</script>
+</body>
+</html>

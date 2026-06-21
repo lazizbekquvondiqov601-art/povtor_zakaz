@@ -192,12 +192,39 @@ async def pending_orders_text(message: types.Message):
         unique_id = str(uuid.uuid4())[:8]
         STAT_CACHE[unique_id] = cat
         kb.append([InlineKeyboardButton(text=f"📂 {cat}", callback_data=f"pendCat_{unique_id}")])
+    
+    # 🟢 Billz uchun Excel tugmasini qo'shamiz
+    kb.append([InlineKeyboardButton(text="📥 Billz uchun Excel (Sklad)", callback_data="download_sklad_excel")])
     kb.append([InlineKeyboardButton(text="❌ Yopish", callback_data="del_msg")])
 
     await message.answer(
         "⏳ <b>JARAYONDA (YO'LDA)</b>\nQaysi bo'limni ko'rmoqchisiz?",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
     )
+
+@router.callback_query(F.data == "download_sklad_excel")
+async def download_sklad_excel_handler(callback: CallbackQuery):
+    await callback.message.answer("⏳ <b>Sklad uchun Excel fayl shakllantirilmoqda...</b>\nBiroz kuting.")
+    
+    excel_buf = await asyncio.to_thread(db_manager.generate_sklad_excel)
+
+    if not excel_buf:
+        await callback.message.answer("⚠️ Hozircha 'Jarayonda' turgan (Topdim) tovarlar yo'q.")
+        await callback.answer()
+        return
+
+    today_str = datetime.now().strftime("%d.%m.%Y")
+    file = BufferedInputFile(excel_buf.getvalue(), filename=f"Billz_Import_{today_str}.xlsx")
+
+    caption_text = (
+        "📥 <b>Sklad uchun import fayli tayyor!</b>\n\n"
+        "👉 <i>Bu faylda 'Jarayonda'gi barcha tovarlar joylangan.</i>\n"
+        "👉 <i>Barcode va Kol-vo ustunlari bo'sh qoldirildi.</i>\n\n"
+        "👨‍💻 Skladchi mollar kelganda sanab, faqat eng oxirgi <b>'Кол-во'</b> ustuniga sonini yozadi va to'g'ridan-to'g'ri Billz ga yuklaydi."
+    )
+
+    await callback.message.answer_document(file, caption=caption_text)
+    await callback.answer()
 
 @router.callback_query(F.data.startswith("pendCat_"))
 async def pending_category_click(callback: CallbackQuery):
@@ -340,7 +367,8 @@ def build_caption_helper(article, group, first, color_type, pending_df=None):
         price_str = format_money(first.get('supply_price', 0))
         caption += f"👤 {first.get('supplier', '-')}\n💵 {price_str} so'm\n"
     elif color_type in ('yellow', 'red'):
-        caption += f"({first.get('supplier', 'Noma\u02bclum')})\n"
+        _unknown = 'Noma\u02bclum'
+        caption += f"({first.get('supplier', _unknown)})\n"
 
     for shop, s_group in group.groupby('shop'):
         caption += f"\n🏪 <b>{shop}:</b>"

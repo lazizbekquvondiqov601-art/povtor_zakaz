@@ -1,0 +1,562 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ subcategory }} — {{ category }} — OBR — Zakaz Panel{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Page header */
+.page-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-4); flex-wrap:wrap; gap:var(--space-3); }
+.page-title { font-size:var(--text-2xl); font-weight:var(--weight-bold); color:var(--text-strong); }
+
+/* Breadcrumb */
+.breadcrumb-nav { display:flex; align-items:center; gap:var(--space-2); font-size:var(--text-sm); margin-bottom:var(--space-3); flex-wrap:wrap; }
+.breadcrumb-nav a { color:var(--text-muted); text-decoration:none; }
+.breadcrumb-nav a:hover { color:var(--accent); }
+.breadcrumb-sep { color:var(--text-muted); opacity:0.4; }
+.breadcrumb-current { color:var(--text-body); font-weight:var(--weight-semibold); }
+
+/* DS Card */
+.ds-card { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); }
+
+/* Filter bar */
+.filter-bar { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-4) var(--space-5); margin-bottom:var(--space-4); display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
+.filter-bar .search-input { flex:1; min-width:200px; padding:7px 12px 7px 34px; border:1px solid var(--border-default); border-radius:var(--radius-md); font-size:var(--text-sm); font-family:var(--font-sans); background:var(--surface-sunken); color:var(--text-body); outline:none; transition:border-color 0.15s; }
+.filter-bar .search-input:focus { border-color:var(--accent); }
+.search-wrap { position:relative; flex:1; min-width:200px; }
+.search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-muted); pointer-events:none; }
+.filter-select { padding:7px 10px; border:1px solid var(--border-default); border-radius:var(--radius-md); font-size:var(--text-sm); font-family:var(--font-sans); background:var(--surface-sunken); color:var(--text-body); cursor:pointer; max-width:220px; }
+
+/* DS Table */
+.ds-table { width:100%; border-collapse:collapse; font-size:var(--text-sm); }
+.ds-table th { padding:10px 14px; text-align:left; font-size:var(--text-xs); font-weight:var(--weight-bold); letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); border-bottom:2px solid var(--border-subtle); background:var(--surface-sunken); position:sticky; top:0; z-index:2; }
+.ds-table th.th-accent { background:var(--accent-soft); color:var(--accent) !important; }
+.ds-table td { padding:10px 14px; border-bottom:1px solid var(--border-subtle); color:var(--text-body); vertical-align:middle; }
+.ds-table tr:last-child td { border-bottom:none; }
+.ds-table tr:hover td { background:var(--surface-sunken); }
+.ds-table tfoot td { font-weight:var(--weight-semibold); color:var(--text-strong); background:var(--surface-sunken); }
+
+/* Zakaz cell highlight */
+.zakaz-cell { font-family:var(--font-mono); font-weight:var(--weight-extrabold); }
+.zakaz-cell.has-zakaz { background:var(--accent-soft); color:var(--accent); padding:3px 10px; border-radius:var(--radius-pill); display:inline-block; }
+
+/* OBR Color badges */
+.obr-badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:var(--radius-pill); font-size:var(--text-xs); font-weight:var(--weight-bold); font-family:var(--font-mono); min-width:45px; justify-content:center; }
+.obr-green  { background:#dcfce7; color:#166534; }
+.obr-yellow { background:#fef9c3; color:#854d0e; }
+.obr-orange { background:#ffedd5; color:#9a3412; }
+.obr-red    { background:#fee2e2; color:#991b1b; }
+
+/* DS Badge */
+.ds-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:var(--radius-pill); font-size:var(--text-xs); font-weight:var(--weight-semibold); }
+.ds-badge-primary { background:var(--accent-soft); color:var(--accent); }
+.ds-badge-muted { background:var(--surface-sunken); color:var(--text-muted); }
+
+/* DS Button */
+.ds-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; font-family:var(--font-sans); font-size:var(--text-sm); font-weight:var(--weight-semibold); border-radius:var(--radius-md); border:none; cursor:pointer; transition:background 0.15s; text-decoration:none; }
+.ds-btn-secondary { background:var(--surface-sunken); color:var(--text-body); border:1px solid var(--border-default); }
+.ds-btn-secondary:hover { background:var(--surface-card); color:var(--text-body); }
+.ds-btn-outline { background:transparent; color:var(--accent); border:1.5px solid var(--accent); }
+.ds-btn-outline:hover { background:var(--accent-soft); color:var(--accent); }
+.ds-btn-sm { padding:5px 10px; font-size:var(--text-xs); }
+.ds-btn svg { width:15px; height:15px; }
+
+/* Toggle buttons */
+.toggle-group { display:inline-flex; border:1px solid var(--border-default); border-radius:var(--radius-md); overflow:hidden; }
+.toggle-group a { padding:6px 14px; font-size:var(--text-xs); font-weight:var(--weight-semibold); text-decoration:none; color:var(--text-muted); background:var(--surface-sunken); border-right:1px solid var(--border-default); transition:all 0.15s; }
+.toggle-group a:last-child { border-right:none; }
+.toggle-group a.active { background:var(--accent); color:#fff; }
+.toggle-group a:hover:not(.active) { background:var(--surface-card); }
+
+/* Pagination */
+.pagination-bar { display:flex; align-items:center; justify-content:space-between; padding:var(--space-4) var(--space-5); border-top:1px solid var(--border-subtle); flex-wrap:wrap; gap:var(--space-3); }
+.pagination-bar .page-info { font-size:var(--text-xs); color:var(--text-muted); }
+.pagination-links { display:flex; gap:2px; }
+.pagination-links a, .pagination-links span { display:inline-flex; align-items:center; justify-content:center; min-width:32px; height:32px; padding:0 8px; font-size:var(--text-xs); font-weight:var(--weight-semibold); border-radius:var(--radius-sm); text-decoration:none; transition:all 0.15s; }
+.pagination-links a { color:var(--text-body); background:var(--surface-sunken); border:1px solid var(--border-subtle); }
+.pagination-links a:hover { background:var(--surface-card); border-color:var(--accent); color:var(--accent); }
+.pagination-links .current { background:var(--accent); color:#fff; border:1px solid var(--accent); }
+.pagination-links .disabled { color:var(--text-muted); opacity:0.5; cursor:not-allowed; background:var(--surface-sunken); border:1px solid var(--border-subtle); }
+
+/* Summary cards */
+.summary-row { display:flex; gap:var(--space-3); margin-bottom:var(--space-4); flex-wrap:wrap; }
+.summary-card { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:var(--space-3) var(--space-4); flex:1; min-width:130px; }
+.summary-card .sc-label { font-size:var(--text-xs); color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; font-weight:var(--weight-bold); }
+.summary-card .sc-value { font-size:var(--text-lg); font-weight:var(--weight-extrabold); color:var(--text-strong); font-family:var(--font-mono); margin-top:2px; }
+
+/* Empty state */
+.empty-state { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:var(--space-8); text-align:center; }
+
+/* Row with zero zakaz gets slightly muted */
+.row-no-zakaz td { opacity:0.65; }
+.row-no-zakaz:hover td { opacity:1; }
+
+/* Autocomplete */
+.ac-wrap { position:relative; flex:1; min-width:200px; }
+.ac-wrap > svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--text-muted); pointer-events:none; }
+.ac-dropdown { position:absolute; top:calc(100% + 3px); left:0; right:0; background:var(--surface-card); border:1px solid var(--border-default); border-radius:var(--radius-md); box-shadow:var(--shadow-md); z-index:200; max-height:220px; overflow-y:auto; display:none; }
+.ac-item { padding:7px 12px; cursor:pointer; font-size:var(--text-sm); color:var(--text-body); border-bottom:1px solid var(--border-subtle); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ac-item:last-child { border-bottom:none; }
+.ac-item:hover, .ac-item.ac-active { background:var(--accent-soft); color:var(--accent); }
+.ac-hl { font-weight:var(--weight-bold); color:var(--accent); }
+
+/* ── Mobile (telefon) — max-width:640px ── */
+@media (max-width: 640px) {
+    .page-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .page-head > div { width: 100%; }
+    .page-title { font-size: var(--text-xl); }
+    .toggle-group { width: 100%; }
+    .toggle-group a { flex: 1; text-align: center; }
+
+    /* Filter bar — vertikal, to'liq kenglik */
+    .filter-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .ac-wrap, .search-wrap { min-width: 0; width: 100%; }
+    .filter-select { max-width: 100% !important; width: 100%; box-sizing: border-box; }
+    .filter-bar .ds-btn { width: 100%; justify-content: center; }
+    #sub-switcher { max-width: 100% !important; width: 100%; }
+
+    /* Summary cards — full width stack */
+    .summary-card { min-width: 100%; }
+
+    /* Jadval — yonga scroll qilib ko'riladi (overflow-x:auto wrapper saqlanadi) */
+
+    /* Pagination — wrap */
+    .pagination-bar { flex-direction: column; gap: 10px; }
+    .pagination-links { flex-wrap: wrap; justify-content: center; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Breadcrumb -->
+<nav class="breadcrumb-nav">
+    <a href="/obr/">OBR</a>
+    <span class="breadcrumb-sep">/</span>
+    <a href="/obr/{{ category|urlencode }}/">{{ category }}</a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">{{ subcategory }}</span>
+</nav>
+
+<div class="page-head">
+    <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;">
+        <div class="page-title">{{ subcategory }}</div>
+        {% if sibling_subcategories|length > 1 %}
+        <select id="sub-switcher" class="filter-select" style="max-width:260px;font-weight:var(--weight-semibold);"
+                onchange="location.href='/obr/'+encodeURIComponent('{{ category }}')+'/'+encodeURIComponent(this.value)+'/'">
+            {% for sub in sibling_subcategories %}
+            <option value="{{ sub }}" {% if sub == subcategory %}selected{% endif %}>{{ sub }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+    </div>
+    <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;">
+        <!-- Faqat zakaz borlar / Hammasi -->
+        <div class="toggle-group">
+            <a href="?show_all=0{% if segment_filter %}&segment={{ segment_filter|urlencode }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter|urlencode }}{% endif %}{% if pol_filter %}&pol={{ pol_filter|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
+               class="{% if not show_all %}active{% endif %}">
+                Faqat zakaz
+            </a>
+            <a href="?show_all=1{% if segment_filter %}&segment={{ segment_filter|urlencode }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter|urlencode }}{% endif %}{% if pol_filter %}&pol={{ pol_filter|urlencode }}{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
+               class="{% if show_all %}active{% endif %}">
+                Hammasi
+            </a>
+        </div>
+        <a href="?{% if show_all %}show_all=1&{% endif %}{% if segment_filter %}segment={{ segment_filter|urlencode }}&{% endif %}{% if supplier_filter %}supplier={{ supplier_filter|urlencode }}&{% endif %}{% if search_query %}q={{ search_query|urlencode }}&{% endif %}export=1"
+           class="ds-btn" style="background:#16a34a;color:#fff;" title="Excel yuklab olish">
+            <svg data-lucide="download"></svg> Excel
+        </a>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div class="summary-row">
+    <div class="summary-card">
+        <div class="sc-label">Jami zakaz</div>
+        <div class="sc-value">{{ total_packs }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="sc-label">Natija soni</div>
+        <div class="sc-value">{{ total_rows_count }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="sc-label">Jami sotuv</div>
+        <div class="sc-value">{{ total_sotuv }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="sc-label">Jami qoldiq</div>
+        <div class="sc-value">{{ total_qoldiq }}</div>
+    </div>
+    <div class="summary-card">
+        <div class="sc-label">Umumiy OBR</div>
+        <div class="sc-value">
+            <span class="obr-badge {{ total_obr_class }}">{{ total_obr }}%</span>
+        </div>
+    </div>
+</div>
+
+<!-- Filter bar -->
+<form class="filter-bar" method="get" id="filter-form">
+    {% if show_all %}<input type="hidden" name="show_all" value="1">{% endif %}
+
+    <div class="ac-wrap" id="stat-ac-wrap">
+        <svg data-lucide="search"></svg>
+        <input type="text" name="q" id="stat-search" class="search-input"
+               placeholder="Nom, material, supplier..." value="{{ search_query }}"
+               autocomplete="off">
+        <div class="ac-dropdown" id="stat-ac-drop"></div>
+    </div>
+
+    <select name="segment" class="filter-select" onchange="this.form.submit()">
+        <option value="">Barcha segmentlar</option>
+        {% for seg in segments_list %}
+            <option value="{{ seg }}" {% if segment_filter == seg %}selected{% endif %}>{{ seg }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="pol" class="filter-select" onchange="this.form.submit()">
+        <option value="">Barcha jinslar</option>
+        {% for pol in pols_list %}
+            <option value="{{ pol }}" {% if pol_filter == pol %}selected{% endif %}>{{ pol }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="submit" class="ds-btn ds-btn-secondary ds-btn-sm">
+        <svg data-lucide="search"></svg>
+        Qidirish
+    </button>
+
+    {% if search_query or segment_filter or pol_filter %}
+        <a href="?{% if show_all %}show_all=1{% endif %}" class="ds-btn ds-btn-secondary ds-btn-sm" style="color:var(--danger);">
+            <svg data-lucide="x"></svg>
+            Tozalash
+        </a>
+    {% endif %}
+</form>
+
+{% if page_obj and page_obj.object_list %}
+<div class="ds-card" style="overflow:hidden;">
+    <div style="overflow-x:auto;">
+        <table class="ds-table">
+            <thead>
+                <tr>
+                    <th style="width:36px;">
+                        <input type="checkbox" id="chk-all" style="accent-color:var(--accent);width:14px;height:14px;" title="Hammasini tanlash">
+                    </th>
+                    <th style="width:36px;">#</th>
+                    <th>Nomi</th>
+                    <th>Segment</th>
+                    <th style="text-align:center;">Razmer</th>
+                    <th style="text-align:center;">Jins</th>
+                    <th class="th-accent" style="text-align:center;">Zakaz</th>
+                    <th style="text-align:center;">Qoldiq</th>
+                    <th style="text-align:center;">Sotuv</th>
+                    <th style="text-align:center;">O'rt. Qoldiq</th>
+                    <th style="text-align:center;">OBR%</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in page_obj %}
+                <tr class="{% if o.zakaz == 0 %}row-no-zakaz{% endif %}">
+                    <td data-label="Tanlash" style="text-align:center;">
+                        <input type="checkbox" class="row-chk" style="accent-color:var(--accent);width:14px;height:14px;"
+                               data-naimenovanie="{{ o.naimenovanie }}"
+                               data-segment="{{ o.segment }}"
+                               data-razmer="{{ o.razmer }}"
+                               data-material="{{ o.material }}"
+                               data-vid="{{ o.vid }}"
+                               data-pol="{{ o.pol }}"
+                               data-zakaz="{{ o.zakaz }}"
+                               data-sotilgan="{{ o.sotilgan }}"
+                               data-qoldiq="{{ o.qoldiq }}"
+                               data-obr="{{ o.obr }}">
+                    </td>
+                    <td data-label="#" style="color:var(--text-muted);font-family:var(--font-mono);font-size:var(--text-xs);">
+                        {{ page_obj.start_index|add:forloop.counter0 }}
+                    </td>
+                    <td data-label="Nomi">
+                        <div style="font-weight:var(--weight-semibold);color:var(--text-strong);">{{ o.naimenovanie }}</div>
+                        {% if o.material %}
+                            <div style="font-size:var(--text-xs);color:var(--text-muted);">{{ o.material }}{% if o.vid %} / {{ o.vid }}{% endif %}</div>
+                        {% endif %}
+                    </td>
+                    <td data-label="Segment" style="font-size:var(--text-xs);color:var(--text-muted);">{{ o.segment }}</td>
+                    <td data-label="Razmer" style="text-align:center;font-weight:var(--weight-bold);font-family:var(--font-mono);">{{ o.razmer }}</td>
+                    <td data-label="Jins" style="text-align:center;font-size:var(--text-xs);">{{ o.pol }}</td>
+                    <td data-label="Zakaz" style="text-align:center;">
+                        {% if o.zakaz > 0 %}
+                            <span class="zakaz-cell has-zakaz">{{ o.zakaz }}</span>
+                        {% else %}
+                            <span style="color:var(--text-muted);font-family:var(--font-mono);">0</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="Qoldiq" style="text-align:center;font-family:var(--font-mono);">{{ o.qoldiq }}</td>
+                    <td data-label="Sotuv" style="text-align:center;font-family:var(--font-mono);">{{ o.sotilgan }}</td>
+                    <td data-label="O'rt. Qoldiq" style="text-align:center;font-family:var(--font-mono);font-size:var(--text-xs);">{{ o.ortacha_qoldiq }}</td>
+                    <td data-label="OBR%" style="text-align:center;">
+                        <span class="obr-badge {{ o.obr_class }}">{{ o.obr }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="6" style="text-align:right;color:var(--text-muted);">Sahifadagi jami zakaz:</td>
+                    <td style="text-align:center;">
+                        <span class="ds-badge ds-badge-primary" style="font-family:var(--font-mono);">{{ total_packs }}</span>
+                    </td>
+                    <td colspan="4"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="pagination-bar">
+        <div class="page-info">
+            {{ page_obj.start_index }}—{{ page_obj.end_index }} / {{ page_obj.paginator.count }} ta natija
+            ({{ page_obj.paginator.num_pages }} sahifa)
+        </div>
+        <div class="pagination-links">
+            {% if page_obj.has_previous %}
+                <a href="?page=1{% if show_all %}&show_all=1{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if segment_filter %}&segment={{ segment_filter|urlencode }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter|urlencode }}{% endif %}"
+                   title="Birinchi sahifa">&laquo;</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if show_all %}&show_all=1{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if segment_filter %}&segment={{ segment_filter|urlencode }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter|urlencode }}{% endif %}">&lsaquo;</a>
+            {% else %}
+                <span class="disabled">&laquo;</span>
+                <span class="disabled">&lsaquo;</span>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <span class="current">{{ num }}</span>
+                {% elif num > page_obj.number|add:"-4" and num < page_obj.number|add:"4" %}
+                    <a href="?page={{ num }}{% if show_all %}&show_all=1{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if segment_filter %}&segment={{ segment_filter|urlencode }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter|urlencode }}{% endif %}">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if show_all %}&show_all=1{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if segment_filter %}&segment={{ segment_filter|urlencode }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter|urlencode }}{% endif %}">&rsaquo;</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if show_all %}&show_all=1{% endif %}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}{% if segment_filter %}&segment={{ segment_filter|urlencode }}{% endif %}{% if supplier_filter %}&supplier={{ supplier_filter|urlencode }}{% endif %}"
+                   title="Oxirgi sahifa">&raquo;</a>
+            {% else %}
+                <span class="disabled">&rsaquo;</span>
+                <span class="disabled">&raquo;</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div style="font-weight:var(--weight-semibold);color:var(--text-strong);margin-bottom:var(--space-2);">
+        {% if search_query or segment_filter or supplier_filter %}
+            Filtr bo'yicha natija topilmadi
+        {% else %}
+            Zakaz kerak bo'lgan tovar topilmadi
+        {% endif %}
+    </div>
+    <div style="font-size:var(--text-sm);color:var(--text-muted);">
+        {% if search_query or segment_filter or supplier_filter %}
+            Filtrlarni tozalab qayta urinib ko'ring.
+        {% else %}
+            Bu podkategoriyada hozircha zakaz yo'q. "Hammasi" rejimini tanlang barcha tovarlarni ko'rish uchun.
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- OBR rang izoh -->
+<div style="margin-top:var(--space-4);display:flex;gap:var(--space-4);flex-wrap:wrap;align-items:center;">
+    <span style="font-size:var(--text-xs);color:var(--text-muted);font-weight:var(--weight-semibold);">OBR izoh:</span>
+    <span class="obr-badge obr-green" style="font-size:10px;">99%+ Juda yaxshi</span>
+    <span class="obr-badge obr-yellow" style="font-size:10px;">85-98% Yaxshi</span>
+    <span class="obr-badge obr-orange" style="font-size:10px;">70-84% O'rtacha</span>
+    <span class="obr-badge obr-red" style="font-size:10px;">&lt;70% Past</span>
+</div>
+
+<!-- Action buttons -->
+<div style="display:flex;gap:var(--space-3);margin-top:var(--space-4);">
+    <a href="/obr/{{ category|urlencode }}/" class="ds-btn ds-btn-secondary">
+        <svg data-lucide="arrow-left"></svg>
+        {{ category }}
+    </a>
+    <a href="/obr/?refresh=1" class="ds-btn ds-btn-outline">
+        <svg data-lucide="refresh-cw"></svg>
+        Qayta hisoblash
+    </a>
+</div>
+
+<script>
+(function(){
+    const NAMES = {{ names_json|safe }};
+    const inp   = document.getElementById('stat-search');
+    const drop  = document.getElementById('stat-ac-drop');
+    if (!inp) return;
+    let activeIdx = -1;
+
+    function hl(text, tokens) {
+        let out = text;
+        tokens.forEach(t => {
+            if (!t) return;
+            const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+            out = out.replace(re, '<span class="ac-hl">$1</span>');
+        });
+        return out;
+    }
+
+    function show(q) {
+        const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+        if (!tokens.length) { drop.style.display='none'; return; }
+        const matches = NAMES.filter(n =>
+            tokens.every(t => n.toLowerCase().includes(t))
+        ).slice(0, 10);
+        if (!matches.length) { drop.style.display='none'; return; }
+        drop.innerHTML = matches.map(n =>
+            `<div class="ac-item" data-val="${n.replace(/"/g,'&quot;')}">${hl(n, tokens)}</div>`
+        ).join('');
+        activeIdx = -1;
+        drop.style.display = 'block';
+        drop.querySelectorAll('.ac-item').forEach(el => {
+            el.addEventListener('mousedown', e => {
+                e.preventDefault();
+                inp.value = el.dataset.val;
+                drop.style.display = 'none';
+                inp.closest('form').submit();
+            });
+        });
+    }
+
+    inp.addEventListener('input',  () => show(inp.value.trim()));
+    inp.addEventListener('focus',  () => { if(inp.value.trim()) show(inp.value.trim()); });
+    inp.addEventListener('keydown', e => {
+        const items = drop.querySelectorAll('.ac-item');
+        if (!items.length) return;
+        if (e.key==='ArrowDown')  { e.preventDefault(); activeIdx=Math.min(activeIdx+1, items.length-1); }
+        else if (e.key==='ArrowUp') { e.preventDefault(); activeIdx=Math.max(activeIdx-1,-1); }
+        else if (e.key==='Enter' && activeIdx>=0) {
+            e.preventDefault();
+            inp.value = items[activeIdx].dataset.val;
+            drop.style.display='none';
+            inp.closest('form').submit(); return;
+        } else if (e.key==='Escape') { drop.style.display='none'; return; }
+        items.forEach((el,i) => el.classList.toggle('ac-active', i===activeIdx));
+        if (activeIdx>=0) items[activeIdx].scrollIntoView({block:'nearest'});
+    });
+    document.addEventListener('click', e => {
+        if (!document.getElementById('stat-ac-wrap').contains(e.target))
+            drop.style.display='none';
+    });
+})();
+</script>
+
+<!-- Suzuvchi yuborish tugmasi -->
+<div id="send-bar" style="display:none;position:fixed;bottom:24px;right:24px;z-index:500;">
+    <button id="send-btn"
+            style="display:flex;align-items:center;gap:8px;padding:12px 20px;
+                   background:#2563eb;color:#fff;border:none;border-radius:var(--radius-lg);
+                   font-size:var(--text-sm);font-weight:var(--weight-bold);cursor:pointer;
+                   box-shadow:0 4px 16px rgba(37,99,235,0.4);">
+        <svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'
+             fill='none' stroke='currentColor' stroke-width='2'>
+            <line x1='22' y1='2' x2='11' y2='13'/>
+            <polygon points='22 2 15 22 11 13 2 9 22 2'/>
+        </svg>
+        <span><span id="send-count">0 ta</span> tanlandi — Telegramga yuborish</span>
+    </button>
+</div>
+
+<script>
+// OBR Telegram yuborish logikasi
+(function(){
+    const allChk  = document.getElementById('chk-all');
+    const sendBar = document.getElementById('send-bar');
+    const sendBtn = document.getElementById('send-btn');
+    const countEl = document.getElementById('send-count');
+    const sendBtnHTML = sendBtn ? sendBtn.innerHTML : '';
+
+    function getChecked(){
+        return document.querySelectorAll('.row-chk:checked');
+    }
+    function updateBar(){
+        const n = getChecked().length;
+        if(sendBar) sendBar.style.display = n > 0 ? 'block' : 'none';
+        if(countEl) countEl.textContent = n + ' ta';
+        if(allChk){
+            const all = document.querySelectorAll('.row-chk');
+            allChk.checked = all.length > 0 && n === all.length;
+            allChk.indeterminate = n > 0 && n < all.length;
+        }
+    }
+
+    // Hammasini tanlash
+    if(allChk){
+        allChk.addEventListener('change', function(){
+            document.querySelectorAll('.row-chk').forEach(c => c.checked = this.checked);
+            updateBar();
+        });
+    }
+    document.querySelectorAll('.row-chk').forEach(c => {
+        c.addEventListener('change', updateBar);
+    });
+
+    // Yuborish
+    if(sendBtn){
+        sendBtn.addEventListener('click', function(){
+            const checked = getChecked();
+            if(!checked.length) return;
+
+            const items = Array.from(checked).map(c => ({
+                naimenovanie: c.dataset.naimenovanie,
+                segment:      c.dataset.segment,
+                razmer:       c.dataset.razmer,
+                material:     c.dataset.material,
+                vid:          c.dataset.vid,
+                pol:          c.dataset.pol,
+                zakaz:        c.dataset.zakaz,
+                sotilgan:     c.dataset.sotilgan,
+                qoldiq:       c.dataset.qoldiq,
+                obr:          c.dataset.obr,
+            }));
+
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Yuborilmoqda...';
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                              document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+
+            fetch(window.location.pathname + 'send/', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken': csrfToken},
+                body: JSON.stringify({items: items})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if(data.ok){
+                    sendBtn.textContent = '✅ Yuborildi! (' + data.sent + ' ta)';
+                    setTimeout(function(){
+                        sendBtn.disabled = false;
+                        sendBtn.innerHTML = sendBtnHTML;
+                        updateBar();
+                    }, 2000);
+                } else {
+                    alert('Xato: ' + (data.error || 'Nomalum xato'));
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = sendBtnHTML;
+                    updateBar();
+                }
+            })
+            .catch(function(err){
+                alert('Tarmoq xatosi: ' + err);
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = sendBtnHTML;
+                updateBar();
+            });
+        });
+    }
+
+    updateBar();
+})();
+</script>
+
+{% endblock %}

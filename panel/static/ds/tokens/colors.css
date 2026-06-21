@@ -1,0 +1,112 @@
+/* ============================================================
+   Zakaz Panel — Color tokens
+   Anchored on the product's navy sidebar (#1a1a2e) and
+   Bootstrap-blue actions, refined into a cohesive cool palette.
+   Base palettes first, then semantic aliases.
+   ============================================================ */
+:root {
+  /* --- Brand navy (the sidebar / ink) --- */
+  --navy-950: #0e1326;
+  --navy-900: #161d36;  /* sidebar base */
+  --navy-800: #1f2949;
+  --navy-700: #2a3760;
+  --navy-600: #394a7d;
+  --navy-500: #4d61a0;
+
+  /* --- Primary blue (actions, links, focus) --- */
+  --blue-50:  #eef3ff;
+  --blue-100: #dbe6ff;
+  --blue-200: #bcd0ff;
+  --blue-300: #8fb0ff;
+  --blue-400: #5d89f5;
+  --blue-500: #3b6ce8;
+  --blue-600: #2f5fd6;  /* primary action */
+  --blue-700: #2549a8;
+  --blue-800: #213c85;
+
+  /* --- Slate neutrals (cool grays, harmonize with navy) --- */
+  --slate-50:  #f6f8fc;
+  --slate-100: #eef1f7;
+  --slate-200: #e2e7f0;
+  --slate-300: #cdd5e3;
+  --slate-400: #9aa6be;
+  --slate-500: #6c7890;
+  --slate-600: #4d586e;
+  --slate-700: #374152;
+  --slate-800: #232b3a;
+  --slate-900: #151b27;
+  --white: #ffffff;
+
+  /* --- Semantic hues (refined from the KPI / table-head colors) --- */
+  --green-50:  #e8f7ee;
+  --green-500: #1f9d57;
+  --green-600: #178049;
+  --green-700: #126039;
+
+  --amber-50:  #fdf3da;
+  --amber-500: #e0920f;
+  --amber-600: #bd7a08;
+  --amber-700: #92600a;
+
+  --red-50:    #fdeae8;
+  --red-500:   #e2483d;
+  --red-600:   #c93a30;
+  --red-700:   #a12c24;
+
+  --sky-50:    #e7f3fb;
+  --sky-500:   #2b8fd6;
+  --sky-600:   #1f78ba;
+  --sky-700:   #1a6097;
+
+  /* ============================================================
+     SEMANTIC ALIASES — use these in components, not raw palettes
+     ============================================================ */
+
+  /* Surfaces */
+  --bg-app: var(--slate-50);
+  --surface-card: var(--white);
+  --surface-sunken: var(--slate-100);
+  --surface-hover: var(--slate-100);
+  --surface-sidebar: var(--navy-900);
+  --surface-sidebar-hover: var(--navy-800);
+  --surface-topbar: var(--navy-950);
+
+  /* Text */
+  --text-strong: var(--slate-900);
+  --text-body: var(--slate-700);
+  --text-muted: var(--slate-500);
+  --text-on-dark: #eaeefb;
+  --text-on-dark-muted: rgba(234, 238, 251, 0.60);
+  --text-on-accent: var(--white);
+  --text-link: var(--blue-600);
+
+  /* Borders */
+  --border-subtle: var(--slate-200);
+  --border-default: var(--slate-300);
+  --border-strong: var(--slate-400);
+
+  /* Accent / action */
+  --accent: var(--blue-600);
+  --accent-hover: var(--blue-700);
+  --accent-active: var(--blue-800);
+  --accent-soft: var(--blue-50);
+  --accent-ring: rgba(47, 95, 214, 0.30);
+  --sidebar-active-bar: var(--blue-400);
+
+  /* Status — pair: solid + soft surface + on-soft text */
+  --success: var(--green-600);
+  --success-soft: var(--green-50);
+  --success-text: var(--green-700);
+
+  --warning: var(--amber-600);
+  --warning-soft: var(--amber-50);
+  --warning-text: var(--amber-700);
+
+  --danger: var(--red-600);
+  --danger-soft: var(--red-50);
+  --danger-text: var(--red-700);
+
+  --info: var(--sky-600);
+  --info-soft: var(--sky-50);
+  --info-text: var(--sky-700);
+}

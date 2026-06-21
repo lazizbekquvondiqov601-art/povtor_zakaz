@@ -1,0 +1,5 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Zakaz Panel mark">
+  <rect width="64" height="64" rx="16" fill="#161d36"></rect>
+  <path d="M20 23h24l-24 24h24" stroke="#5d89f5" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <circle cx="47" cy="25" r="3.6" fill="#2f5fd6"></circle>
+</svg>

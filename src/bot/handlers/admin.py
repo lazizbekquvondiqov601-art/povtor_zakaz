@@ -356,7 +356,7 @@ async def obr_seg_detail_click(callback: CallbackQuery):
 
     kb = [[InlineKeyboardButton(
         text="⬅️ Orqaga",
-        callback_data=f"obrSegMenu_{session_id}_{sub_id}_{seg_id}"
+        callback_data=f"obrSegMenu_{session_id}_{cat_id}_{sub_id}_{seg_id}"
     )]]
 
     for i, t_block in enumerate(text_blocks):

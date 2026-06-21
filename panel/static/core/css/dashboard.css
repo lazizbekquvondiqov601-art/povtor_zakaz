@@ -1,0 +1,374 @@
+/* ============================================================
+   Zakaz Panel — Dashboard-specific component styles
+   Design system tokenlariga tayanadi: spacing.css, colors.css,
+   typography.css (base.css ichida yuklanadi).
+   Bootstrap 5 bilan birgalikda ishlaydi.
+   ============================================================ */
+
+
+/* ============================================================
+   1. KPI GRID — 4 ustunli karta panjarasi
+   ============================================================ */
+
+/* 4 ustunli grid; katta ekranlarda gap uchun --space-5 */
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+  margin-bottom: var(--space-6);
+}
+
+/* Mobil (768px va kichik): 2 ustunli rejim */
+@media (max-width: 768px) {
+  .dash-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-4);
+  }
+}
+
+/* Juda kichik ekranlar (480px va kichik): 1 ustun */
+@media (max-width: 480px) {
+  .dash-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ============================================================
+   2. KPI CARD — asosiy karta komponenti
+   ============================================================ */
+
+.dash-kpi-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+
+  /* Chap tomonda rangli chegara — variant klasslari bilan o'zgaradi */
+  border-left: 4px solid var(--border-default);
+
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard);
+
+  /* Karta ichidagi elementlar vertikal tartibda */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Hover: kartani biroz yuqoriga ko'tir va soyani kuchaytir */
+.dash-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+
+/* ============================================================
+   3. KPI CARD VARIANTS — chap chegara ranglari
+   ============================================================ */
+
+/* Shoshilinch / xavfli holat — qizil */
+.dash-kpi-card.urgent {
+  border-left-color: var(--danger);
+}
+
+/* Ogohlantiruv — sariq */
+.dash-kpi-card.warning {
+  border-left-color: var(--warning);
+}
+
+/* Muvaffaqiyat / normal — yashil */
+.dash-kpi-card.success {
+  border-left-color: var(--success);
+}
+
+/* Ma'lumot / neytral — ko'k */
+.dash-kpi-card.info {
+  border-left-color: var(--info);
+}
+
+
+/* ============================================================
+   4. KPI CARD INTERNALS — label, qiymat, trend
+   ============================================================ */
+
+/* Kichik bosh harf yorliq — "BUGUNGI ZAKAZLAR" kabi */
+.dash-kpi-label {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: var(--leading-normal);
+}
+
+/* Katta raqam — asosiy KPI qiymati */
+.dash-kpi-value {
+  font-family: var(--font-mono);           /* Raqamlar uchun monospace */
+  font-size: var(--text-3xl);             /* 36px — e'tiborni jalb qiladi */
+  font-weight: var(--weight-extrabold);
+  color: var(--text-strong);
+  line-height: var(--leading-tight);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Kichik trend ko'rsatkichi: "+12%" yoki "-3" */
+.dash-kpi-trend {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);              /* standart rang — manfiy yoki musbat */
+}
+
+/* Musbat trend — yashil */
+.dash-kpi-trend.positive,
+.dash-kpi-trend[data-trend="up"] {
+  color: var(--success-text);
+}
+
+/* Manfiy trend — qizil */
+.dash-kpi-trend.negative,
+.dash-kpi-trend[data-trend="down"] {
+  color: var(--danger-text);
+}
+
+
+/* ============================================================
+   5. MAIN GRID — 2 ustunli asosiy tarkib panjarasi
+      Chap: 55%, O'ng: 45%
+   ============================================================ */
+
+.dash-main-grid {
+  display: grid;
+  grid-template-columns: 55fr 45fr;
+  gap: var(--space-5);
+  align-items: start;         /* Har bir ustun o'z balandligida */
+}
+
+/* Planshet va mobil (900px va kichik): bitta ustun */
+@media (max-width: 900px) {
+  .dash-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ============================================================
+   6. WIDGET — umumiy widget karta tuzilmasi
+   ============================================================ */
+
+/* Widget — header + body dan iborat karta */
+.dash-widget {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;            /* border-radius ichida qolsin */
+}
+
+/* Widget sarlavhasi — title + ixtiyoriy badge */
+.dash-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);  /* Biroz chuqurroq fon */
+}
+
+/* Widget sarlavha matni */
+.dash-widget-header h2,
+.dash-widget-header h3,
+.dash-widget-title {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-strong);
+  margin: 0;
+  line-height: var(--leading-snug);
+}
+
+/* Widget asosiy mazmuni — ichki bo'shliq */
+.dash-widget-body {
+  padding: var(--space-4) var(--space-5);
+}
+
+/* Ichki bo'shligsiz variant — jadval to'liq kenglikda bo'lishi uchun */
+.dash-widget-body.no-pad {
+  padding: 0;
+}
+
+
+/* ============================================================
+   7. DASHBOARD TABLE — toza jadval, tashqi chegara yo'q
+   ============================================================ */
+
+.dash-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+
+/* Jadval sarlavha — kichik bosh harf ustun nomlari */
+.dash-table th {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 2px solid var(--border-default);
+  text-align: left;
+  white-space: nowrap;            /* Sarlavhalar siqilmasin */
+  background: var(--surface-sunken);
+}
+
+/* Raqamli ustunlar — o'ngdan hizalash */
+.dash-table th.num,
+.dash-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* Jadval katakchasi */
+.dash-table td {
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-body);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+  line-height: var(--leading-normal);
+}
+
+/* Oxirgi qatorda pastki chegara yo'q */
+.dash-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Navbatma-navbat qator ranglari — "zebra striping" */
+.dash-table tbody tr:nth-child(even) {
+  background: var(--surface-sunken);
+}
+
+/* Hover: qatorni biroz ajratib ko'rsat */
+.dash-table tbody tr:hover {
+  background: var(--accent-soft);
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+
+/* ============================================================
+   8. URGENCY ROW HIGHLIGHTS — muddati o'tgan qatorlar
+   ============================================================ */
+
+/* Qizil qator — shoshilinch, muddati o'tgan */
+.urgent-row-red {
+  background: rgba(239, 68, 68, 0.08) !important; /* yengil qizil ton */
+}
+
+.urgent-row-red:hover {
+  background: rgba(239, 68, 68, 0.14) !important;
+}
+
+/* Sariq qator — ogohlantirish, tez orada muddati tugaydi */
+.urgent-row-yellow {
+  background: rgba(234, 179, 8, 0.08) !important; /* yengil sariq ton */
+}
+
+.urgent-row-yellow:hover {
+  background: rgba(234, 179, 8, 0.14) !important;
+}
+
+
+/* ============================================================
+   9. DAYS BADGE — "3 kun" kabi qolgan kunlar ko'rsatkichi
+   ============================================================ */
+
+/* Asosiy badge tuzilmasi */
+.days-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);           /* Raqam uchun monospace */
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* Qizil badge — shoshilinch (0-2 kun qoldi) */
+.days-badge.red {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+  border: 1px solid rgba(226, 72, 61, 0.25);
+}
+
+/* Sariq badge — ogohlantirish (3-5 kun qoldi) */
+.days-badge.yellow {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+  border: 1px solid rgba(224, 146, 15, 0.25);
+}
+
+/* Yashil badge — normal holat (6+ kun qoldi) */
+.days-badge.green {
+  background: var(--success-soft);
+  color: var(--success-text);
+  border: 1px solid rgba(31, 157, 87, 0.25);
+}
+
+
+/* ============================================================
+   10. CHART CONTAINER — grafik o'rami
+   ============================================================ */
+
+/* Chart.js yoki boshqa grafik kutubxonalari uchun o'ram */
+.chart-container {
+  position: relative;
+  height: 200px;              /* Belgilangan balandlik */
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Katta widget ichidagi grafik uchun kattaroq variant */
+.chart-container.lg {
+  height: 280px;
+}
+
+
+/* ============================================================
+   11. SUPPLIER TABLE — muammoli yetkazib beruvchilar jadvali
+   ============================================================ */
+
+/* Muammoli yetkazib beruvchi qatori — e'tiborni jalb qiladi */
+.supplier-problem-row {
+  background: var(--danger-soft);
+}
+
+.supplier-problem-row:hover {
+  background: rgba(239, 68, 68, 0.12) !important;
+}
+
+/* Yetkazib beruvchi ismi — bosiladigan havola ko'rinishida */
+.supplier-link {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.supplier-link:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

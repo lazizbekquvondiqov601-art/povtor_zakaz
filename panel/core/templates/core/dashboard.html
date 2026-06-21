@@ -1,0 +1,941 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dashboard — Zakaz Panel{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Sahifa sarlavhasi ── */
+.page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-6);
+}
+.page-title {
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-bold);
+    color: var(--text-strong);
+    line-height: 1.2;
+}
+.page-date {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-top: 3px;
+    font-family: var(--font-mono);
+}
+
+/* ── KPI kartalar ── */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+}
+.kpi-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-5);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    transition: box-shadow 0.15s ease;
+}
+.kpi-card:hover {
+    box-shadow: var(--shadow-md);
+}
+.kpi-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.kpi-icon svg { width: 20px; height: 20px; }
+.kpi-body { min-width: 0; flex: 1; }
+.kpi-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.kpi-value {
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-extrabold);
+    color: var(--text-strong);
+    font-family: var(--font-mono);
+    line-height: 1.15;
+}
+.kpi-footer {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: 5px;
+}
+.kpi-unit {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+}
+/* Trend badge (o'sish/pasayish ko'rsatkichi) */
+.trend-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+}
+.trend-up   { background: #dcfce7; color: #15803d; }
+.trend-down { background: #fee2e2; color: #b91c1c; }
+.trend-zero { background: var(--surface-sunken); color: var(--text-muted); }
+
+/* ── Asosiy ikki ustunli grid ── */
+.dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+    align-items: start;
+}
+
+/* ── DS Card (umumiy karta) ── */
+.ds-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+.ds-card-header {
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border-subtle);
+    font-weight: var(--weight-semibold);
+    font-size: var(--text-sm);
+    color: var(--text-strong);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.ds-card-header .header-icon {
+    width: 18px; height: 18px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+.ds-card-body { padding: var(--space-5); }
+
+/* ── DS Table (umumiy jadval) ── */
+.ds-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+}
+.ds-table th {
+    padding: 9px 12px;
+    text-align: left;
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+.ds-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-body);
+    vertical-align: middle;
+}
+.ds-table tr:last-child td { border-bottom: none; }
+.ds-table tbody tr:hover td { background: var(--surface-sunken); }
+
+/* Xavfli qator (3 kun va kamroq) */
+.row-danger td {
+    background: #fef2f2 !important;
+    color: #7f1d1d;
+}
+.row-danger:hover td { background: #fee2e2 !important; }
+
+/* Ogohlantirish qatori (7 kun va kamroq, lekin 3 dan ko'p) */
+.row-warning td {
+    background: #fffbeb !important;
+    color: #78350f;
+}
+.row-warning:hover td { background: #fef3c7 !important; }
+
+/* Bosiladigan qator */
+.row-clickable { cursor: pointer; }
+
+/* ── DS Badge ── */
+.ds-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    white-space: nowrap;
+}
+.badge-danger  { background: #fee2e2; color: #b91c1c; }
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-primary { background: var(--accent-soft); color: var(--accent); }
+.badge-neutral { background: var(--surface-sunken); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+
+/* ── Chap/O'ng ustunlar: vertikal stack ── */
+.left-col  { display: flex; flex-direction: column; gap: var(--space-5); }
+.right-col { display: flex; flex-direction: column; gap: var(--space-5); }
+
+/* ── Chart canvas ── */
+.chart-wrap { position: relative; }
+
+/* ── Donut legend ── */
+.donut-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-4);
+}
+.donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--text-xs);
+    color: var(--text-body);
+}
+.donut-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ── Supplier jadvalidagi havola ── */
+.supplier-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: var(--weight-medium);
+}
+.supplier-link:hover { text-decoration: underline; }
+
+/* ── Raqam hujayrasi (mono) ── */
+.td-mono {
+    font-family: var(--font-mono);
+    font-weight: var(--weight-semibold);
+    color: var(--text-strong);
+}
+
+/* ── Badge success ── */
+.badge-success { background: #dcfce7; color: #166534; }
+
+/* ── Marja banner ── */
+.marja-banner {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--space-5);
+    overflow: hidden;
+}
+.marja-bg-green { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-color: #86efac; }
+.marja-bg-amber { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-color: #fcd34d; }
+.marja-bg-red   { background: linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%); border-color: #fca5a5; }
+.marja-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+    padding: var(--space-5) var(--space-6);
+}
+.marja-green { color: #15803d; }
+.marja-amber { color: #b45309; }
+.marja-red   { color: #b91c1c; }
+.marja-stat-sep { width: 1px; background: rgba(0,0,0,0.10); align-self: stretch; }
+.marja-progress-bar {
+    height: 4px;
+    background: rgba(0,0,0,0.08);
+}
+.marja-progress-fill {
+    height: 100%;
+    border-radius: 0 2px 2px 0;
+    transition: width 0.6s ease;
+}
+.marja-bg-green .marja-progress-fill { background: #16a34a; }
+.marja-bg-amber .marja-progress-fill { background: #d97706; }
+.marja-bg-red   .marja-progress-fill { background: #dc2626; }
+
+/* ── Responsive ── */
+@media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+    .dash-grid { grid-template-columns: 1fr; }
+    .marja-inner { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 600px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+    .kpi-value { font-size: var(--text-xl); }
+}
+
+/* ── Mobile (telefon) — max-width:640px ── */
+@media (max-width: 640px) {
+    .page-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .page-title { font-size: var(--text-xl); }
+
+    .kpi-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    .kpi-card { padding: var(--space-3); gap: var(--space-3); }
+    .kpi-icon { width: 38px; height: 38px; }
+
+    .dash-grid { grid-template-columns: 1fr !important; gap: var(--space-4); }
+
+    /* Grafiklar to'liq kenglik */
+    .chart-wrap { width: 100%; }
+
+    /* Jadvallar — yonga scroll qilib ko'riladi (overflow-x:auto wrapper) */
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Sahifa sarlavhasi ── -->
+<div class="page-head">
+    <div>
+        <div class="page-title">Dashboard</div>
+        <div class="page-date">{{ today }}</div>
+    </div>
+</div>
+
+<!-- ── 4 ta KPI karta ── -->
+<div class="kpi-grid">
+
+    <!-- 1. Bugungi sotuv + trend -->
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background:#eff6ff; color:#2563eb;">
+            <svg data-lucide="banknote"></svg>
+        </div>
+        <div class="kpi-body">
+            <div class="kpi-label">Bugungi sotuv</div>
+            <div class="kpi-value">{{ kpi.today_sum_fmt }}</div>
+            <div class="kpi-footer">
+                <span class="kpi-unit">so'm</span>
+                <!-- Trend foizi: ijobiy bo'lsa yashil, salbiy bo'lsa qizil -->
+                {% if kpi.trend_pct > 0 %}
+                    <span class="trend-badge trend-up">
+                        <svg data-lucide="trending-up" style="width:11px;height:11px;"></svg>
+                        +{{ kpi.trend_pct }}%
+                    </span>
+                {% elif kpi.trend_pct < 0 %}
+                    <span class="trend-badge trend-down">
+                        <svg data-lucide="trending-down" style="width:11px;height:11px;"></svg>
+                        {{ kpi.trend_pct }}%
+                    </span>
+                {% else %}
+                    <span class="trend-badge trend-zero">— 0%</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Shoshilinch zakazlar -->
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background:#fff1f2; color:#e11d48;">
+            <svg data-lucide="alert-triangle"></svg>
+        </div>
+        <div class="kpi-body">
+            <div class="kpi-label">Shoshilinch zakaz</div>
+            <!-- Agar shoshilinch bo'lsa qizil, aks holda odatiy rang -->
+            <div class="kpi-value" {% if kpi.urgent_count > 0 %}style="color:#dc2626;"{% endif %}>
+                {{ kpi.urgent_count }}
+            </div>
+            <div class="kpi-footer">
+                <span class="kpi-unit">ta mahsulot</span>
+                {% if kpi.urgent_count > 0 %}
+                    <span class="ds-badge badge-danger">Diqqat!</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Kutilmoqda (pending orders) -->
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background:#f0fdf4; color:#16a34a;">
+            <svg data-lucide="shopping-cart"></svg>
+        </div>
+        <div class="kpi-body">
+            <div class="kpi-label">Kutilmoqda</div>
+            <div class="kpi-value">{{ kpi.pending_orders }}</div>
+            <div class="kpi-footer">
+                <span class="kpi-unit">ta zakaz</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Muammoli supplierlar -->
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background:#fffbeb; color:#d97706;">
+            <svg data-lucide="users"></svg>
+        </div>
+        <div class="kpi-body">
+            <div class="kpi-label">Muammoli sup.</div>
+            <div class="kpi-value" {% if kpi.problem_suppliers > 0 %}style="color:#dc2626;"{% endif %}>
+                {{ kpi.problem_suppliers }}
+            </div>
+            <div class="kpi-footer">
+                <span class="kpi-unit">ta supplier</span>
+                {% if kpi.problem_suppliers > 0 %}
+                    <span class="ds-badge badge-warning">Kechikmoqda</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Marja MTD -->
+    <div class="kpi-card">
+        <div class="kpi-icon" style="
+            {% if marja_mtd.marja_pct >= 25 %}background:#f0fdf4;color:#16a34a;
+            {% elif marja_mtd.marja_pct >= 15 %}background:#fffbeb;color:#d97706;
+            {% else %}background:#fff1f2;color:#e11d48;{% endif %}">
+            <svg data-lucide="percent"></svg>
+        </div>
+        <div class="kpi-body">
+            <div class="kpi-label">Marja (oy boshidan)</div>
+            <div class="kpi-value" style="
+                {% if marja_mtd.marja_pct >= 25 %}color:#15803d;
+                {% elif marja_mtd.marja_pct >= 15 %}color:#b45309;
+                {% else %}color:#b91c1c;{% endif %}">
+                {{ marja_mtd.marja_pct }}%
+            </div>
+            <div class="kpi-footer">
+                <span class="kpi-unit">{{ marja_mtd.gross_mln }} foyda</span>
+                <span style="color:var(--text-muted);font-size:10px;">
+                    {{ marja_mtd.day_of_month }}/{{ marja_mtd.days_in_month }} kun
+                </span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Asosiy ikki ustunli kontent ── -->
+<div class="dash-grid">
+
+    <!-- ========== CHAP USTUN ========== -->
+    <div class="left-col">
+    <div class="ds-card">
+        <div class="ds-card-header">
+            <svg data-lucide="zap" class="header-icon"></svg>
+            Shoshilinch zakaz top-10
+        </div>
+
+        {% if urgent_orders %}
+        <div style="overflow-x:auto;">
+            <table class="ds-table">
+                <thead>
+                    <tr>
+                        <th style="width:32px;">#</th>
+                        <th>Nomi</th>
+                        <th>Kategoriya</th>
+                        <th style="text-align:right;">Qoldiq</th>
+                        <th style="text-align:right;">Kun</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in urgent_orders %}
+                    <!-- Qator rangi kunlar_qoldi ga qarab belgilanadi -->
+                    <tr class="row-clickable
+                        {% if r.kunlar_qoldi <= 3 %}row-danger
+                        {% elif r.kunlar_qoldi <= 7 %}row-warning{% endif %}"
+                        onclick="window.location='/obr/{{ r.kategoriya|urlencode }}/';"
+                        title="{{ r.naim }}">
+
+                        <!-- Tartib raqami -->
+                        <td data-label="#" style="color:var(--text-muted); font-size:var(--text-xs);">{{ forloop.counter }}</td>
+
+                        <!-- Mahsulot nomi (25 belgidan uzun bo'lsa qisqartiriladi) -->
+                        <td data-label="Nomi">
+                            <span title="{{ r.naim }}" style="font-weight:var(--weight-medium);">
+                                {{ r.naim|truncatechars:25 }}
+                            </span>
+                        </td>
+
+                        <!-- Kategoriya -->
+                        <td data-label="Kategoriya" style="font-size:var(--text-xs); color:var(--text-muted);">
+                            {{ r.kategoriya|truncatechars:18 }}
+                        </td>
+
+                        <!-- Qoldiq miqdori -->
+                        <td data-label="Qoldiq" class="td-mono" style="text-align:right;">
+                            {{ r.qoldiq|floatformat:0 }}
+                        </td>
+
+                        <!-- Necha kun qolganligini ko'rsatadi -->
+                        <td data-label="Kun" class="td-mono" style="text-align:right;">
+                            {{ r.kunlar_qoldi }}
+                        </td>
+
+                        <!-- Status badge -->
+                        <td data-label="Holat">
+                            {% if r.kunlar_qoldi <= 3 %}
+                                <span class="ds-badge badge-danger">Xavfli</span>
+                            {% elif r.kunlar_qoldi <= 7 %}
+                                <span class="ds-badge badge-warning">Ogohlantirish</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <!-- Agar shoshilinch zakaz bo'lmasa -->
+        <div class="ds-card-body" style="text-align:center; color:var(--text-muted); padding:var(--space-8);">
+            <svg data-lucide="check-circle-2" style="width:36px;height:36px;color:#22c55e;margin-bottom:var(--space-3);"></svg>
+            <div style="font-size:var(--text-sm);">Barcha zakazlar yetarli qoldiqlarga ega</div>
+        </div>
+        {% endif %}
+    </div>
+    <!-- /urgent orders -->
+
+    <!-- O'LIK TOVARLAR -->
+    <div class="ds-card">
+        <div class="ds-card-header">
+            <svg data-lucide="archive-x" class="header-icon"></svg>
+            O'lik tovarlar
+            <span style="font-size:var(--text-xs);color:var(--text-muted);font-weight:400;margin-left:4px;">
+                (30 kun sotilmagan)
+            </span>
+            {% if dead_stock %}
+            <span class="ds-badge badge-danger" style="margin-left:auto;">
+                {{ dead_stock|length }} ta · {{ dead_total_mln }}
+            </span>
+            {% endif %}
+        </div>
+        {% if dead_stock %}
+        <div style="overflow-x:auto;">
+            <table class="ds-table">
+                <thead>
+                    <tr>
+                        <th style="width:28px;">#</th>
+                        <th>Nomi</th>
+                        <th>Kategoriya</th>
+                        <th style="text-align:right;">Qoldiq</th>
+                        <th style="text-align:right;">Muzlagan kapital</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in dead_stock %}
+                    <tr>
+                        <td data-label="#" style="color:var(--text-muted);font-size:var(--text-xs);">{{ forloop.counter }}</td>
+                        <td data-label="Nomi" style="font-weight:var(--weight-medium);" title="{{ item.naim }}">
+                            {{ item.naim|truncatechars:30 }}
+                        </td>
+                        <td data-label="Kategoriya" style="font-size:var(--text-xs);color:var(--text-muted);">
+                            {{ item.kategoriya|truncatechars:20 }}
+                        </td>
+                        <td data-label="Qoldiq" class="td-mono" style="text-align:right;color:#dc2626;font-weight:var(--weight-bold);">
+                            {{ item.qoldiq|floatformat:0 }}
+                        </td>
+                        <td data-label="Muzlagan kapital" style="text-align:right;">
+                            <div class="td-mono" style="font-weight:var(--weight-bold);color:var(--text-strong);">
+                                {{ item.jami_mln }}
+                            </div>
+                            <div style="font-size:10px;color:var(--text-muted);">
+                                {{ item.narx|floatformat:0 }} so'm/dona
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="ds-card-body" style="text-align:center;color:var(--text-muted);padding:var(--space-8);">
+            <svg data-lucide="package-check" style="width:36px;height:36px;color:#22c55e;margin-bottom:var(--space-3);"></svg>
+            <div style="font-size:var(--text-sm);">Barcha tovarlar 30 kun ichida sotilgan</div>
+        </div>
+        {% endif %}
+    </div>
+    <!-- /o'lik tovarlar -->
+
+    </div>
+    <!-- /left-col -->
+
+    <!-- ========== O'NG USTUN ========== -->
+    <div class="right-col">
+
+        <!-- 7 kunlik sotuv trendi -->
+        <div class="ds-card">
+            <div class="ds-card-header">
+                <svg data-lucide="trending-up" class="header-icon"></svg>
+                7-kunlik sotuv trendi
+            </div>
+            <div class="ds-card-body">
+
+                <!-- Navigatsiya -->
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:var(--space-4);">
+                    <!-- Orqaga -->
+                    <a href="?spark_end={{ sales_trend.prev_day }}"
+                       style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--text-body);text-decoration:none;font-size:var(--text-xs);font-weight:600;white-space:nowrap;">
+                        <svg data-lucide="chevron-left" style="width:13px;height:13px;"></svg> Oldingi
+                    </a>
+
+                    <!-- Sana diapazoni + input -->
+                    <form method="get" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">
+                        <span style="font-size:var(--text-xs);color:var(--text-muted);font-weight:600;">
+                            {{ sales_trend.start_date }} — {{ sales_trend.end_date }}
+                        </span>
+                        <input type="date" name="spark_end" value="{{ sales_trend.end_date }}"
+                               onchange="this.form.submit()"
+                               style="padding:3px 6px;font-size:11px;border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--text-body);cursor:pointer;width:130px;text-align:center;">
+                    </form>
+
+                    <!-- Keyingi / Bugun -->
+                    {% if sales_trend.is_today %}
+                    <span style="padding:6px 12px;border:1px solid var(--border-subtle);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--text-muted);font-size:var(--text-xs);font-weight:600;white-space:nowrap;">
+                        Keyingi <svg data-lucide="chevron-right" style="width:13px;height:13px;vertical-align:middle;"></svg>
+                    </span>
+                    {% else %}
+                    <a href="?spark_end={{ sales_trend.next_day }}"
+                       style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border:1px solid var(--border-default);border-radius:var(--radius-md);background:var(--surface-sunken);color:var(--text-body);text-decoration:none;font-size:var(--text-xs);font-weight:600;white-space:nowrap;">
+                        Keyingi <svg data-lucide="chevron-right" style="width:13px;height:13px;"></svg>
+                    </a>
+                    <a href="/"
+                       style="padding:6px 10px;border:1px solid var(--accent);border-radius:var(--radius-md);background:var(--accent-soft);color:var(--accent);text-decoration:none;font-size:var(--text-xs);font-weight:700;white-space:nowrap;">
+                        Bugun
+                    </a>
+                    {% endif %}
+                </div>
+
+                <!-- Qiymatlar: tanlangan oxirgi kun va undan oldingi kun -->
+                <div style="display:flex;gap:var(--space-5);margin-bottom:var(--space-4);">
+                    <div>
+                        <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:var(--weight-bold);">
+                            {{ sales_trend.end_date }}
+                        </div>
+                        <div style="font-family:var(--font-mono);font-weight:var(--weight-bold);color:var(--text-strong);font-size:var(--text-lg);">
+                            {{ sales_trend.last_fmt }} so'm
+                        </div>
+                    </div>
+                    <div style="width:1px;background:var(--border-subtle);"></div>
+                    <div>
+                        <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;font-weight:var(--weight-bold);">
+                            {{ sales_trend.prev_date }}
+                        </div>
+                        <div style="font-family:var(--font-mono);font-weight:var(--weight-semibold);color:var(--text-muted);font-size:var(--text-lg);">
+                            {{ sales_trend.prev_fmt }} so'm
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grafik -->
+                <div class="chart-wrap" style="height:140px;">
+                    <canvas id="sparklineChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kategoriyalar bo'yicha donut (halqa) grafik -->
+        <div class="ds-card">
+            <div class="ds-card-header">
+                <svg data-lucide="pie-chart" class="header-icon"></svg>
+                Kategoriyalar (sotuv)
+            </div>
+            <div class="ds-card-body">
+                <div class="chart-wrap" style="height:200px;">
+                    <canvas id="donutChart"></canvas>
+                </div>
+                <!-- Donut legend (ranglar izohlanadi) — JS bilan to'ldiriladi -->
+                <div class="donut-legend" id="donutLegend"></div>
+            </div>
+        </div>
+
+        <!-- Muammoli supplierlar jadvali -->
+        <div class="ds-card">
+            <div class="ds-card-header">
+                <svg data-lucide="alert-circle" class="header-icon"></svg>
+                Muammoli supplierlar
+            </div>
+
+            {% if supplier_problems %}
+            <div style="overflow-x:auto;">
+                <table class="ds-table">
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th style="text-align:center;">Zakaz</th>
+                            <th style="text-align:right;">Eng ko'hna (kun)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in supplier_problems %}
+                        <!-- 3 kundan eski bo'lsa qizil qator -->
+                        <tr {% if s.oldest_days > 3 %}class="row-danger"{% endif %}>
+
+                            <!-- Supplier nomi — havola orqali o'sha supplierga o'tadi -->
+                            <td data-label="Supplier">
+                                <a href="/supplier/{{ s.supplier }}/"
+                                   class="supplier-link"
+                                   onclick="event.stopPropagation();">
+                                    {{ s.supplier }}
+                                </a>
+                            </td>
+
+                            <!-- Kutilayotgan zakazlar soni -->
+                            <td data-label="Zakaz" style="text-align:center;">
+                                <span class="ds-badge {% if s.pending_count > 5 %}badge-danger{% else %}badge-warning{% endif %}">
+                                    {{ s.pending_count }} ta
+                                </span>
+                            </td>
+
+                            <!-- Eng eski zakazning kuni (qancha vaqt o'tgan) -->
+                            <td data-label="Eng ko'hna" class="td-mono" style="text-align:right;">
+                                {% if s.oldest_days > 3 %}
+                                    <span style="color:#dc2626;">{{ s.oldest_days }} kun</span>
+                                {% else %}
+                                    {{ s.oldest_days }} kun
+                                {% endif %}
+                            </td>
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <!-- Agar muammoli supplier bo'lmasa -->
+            <div class="ds-card-body" style="text-align:center; color:var(--text-muted); padding:var(--space-6);">
+                <svg data-lucide="check-circle-2" style="width:28px;height:28px;color:#22c55e;margin-bottom:var(--space-2);"></svg>
+                <div style="font-size:var(--text-sm);">Hozircha muammoli supplier yo'q</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- SUPPLIER REYTING -->
+        <div class="ds-card">
+            <div class="ds-card-header">
+                <svg data-lucide="award" class="header-icon"></svg>
+                Supplier reyting
+            </div>
+            {% if supplier_rating %}
+            <div style="overflow-x:auto;">
+                <table class="ds-table">
+                    <thead>
+                        <tr>
+                            <th style="width:24px;">#</th>
+                            <th>Supplier</th>
+                            <th style="text-align:center;">Jami</th>
+                            <th style="text-align:center;">✓</th>
+                            <th style="text-align:center;">Rate</th>
+                            <th style="text-align:center;color:#dc2626;">Kutmoqda</th>
+                            <th style="text-align:right;">Invest.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in supplier_rating %}
+                        <tr {% if s.kutilmoqda > 5 %}class="row-warning"{% endif %}>
+                            <td data-label="#" style="color:var(--text-muted);font-size:var(--text-xs);">{{ forloop.counter }}</td>
+                            <td data-label="Supplier">
+                                <a href="/supplier/{{ s.supplier }}/" class="supplier-link">
+                                    {{ s.supplier|truncatechars:20 }}
+                                </a>
+                            </td>
+                            <td data-label="Jami" class="td-mono" style="text-align:center;">{{ s.jami_zakaz }}</td>
+                            <td data-label="Bajarildi" class="td-mono" style="text-align:center;color:#16a34a;">{{ s.bajarildi }}</td>
+                            <td data-label="Rate" style="text-align:center;">
+                                {% if s.completion_rate >= 80 %}
+                                    <span class="ds-badge badge-success">{{ s.completion_rate }}%</span>
+                                {% elif s.completion_rate >= 50 %}
+                                    <span class="ds-badge badge-warning">{{ s.completion_rate }}%</span>
+                                {% else %}
+                                    <span class="ds-badge badge-danger">{{ s.completion_rate }}%</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Kutmoqda" class="td-mono" style="text-align:center;{% if s.kutilmoqda > 0 %}color:#dc2626;font-weight:var(--weight-bold);{% endif %}">
+                                {{ s.kutilmoqda }}
+                            </td>
+                            <td data-label="Invest." class="td-mono" style="text-align:right;font-size:var(--text-xs);color:var(--text-muted);">
+                                {{ s.investitsiya_mln }} mln
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="ds-card-body" style="text-align:center;color:var(--text-muted);padding:var(--space-6);">
+                <div style="font-size:var(--text-sm);">Zakaz ma'lumotlari yo'q</div>
+            </div>
+            {% endif %}
+        </div>
+        <!-- /supplier reyting -->
+
+    </div>
+    <!-- /right-col -->
+
+</div>
+<!-- /dash-grid -->
+
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+// ─────────────────────────────────────────────────────────────
+// Django-dan kelgan JSON ma'lumotlarni o'qiymiz.
+// safe filtri HTML-escaping dan himoya qiladi.
+// ─────────────────────────────────────────────────────────────
+const sparklineData = {{ sparkline_json|safe }};
+const donutData     = {{ donut_json|safe }};
+
+// Donut grafigi uchun rang palitrasini belgilaymiz
+const PALETTE = [
+    '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+    '#8b5cf6', '#06b6d4', '#f97316', '#ec4899',
+    '#84cc16', '#14b8a6',
+];
+
+// ─────────────────────────────────────────────────────────────
+// 1. Sparkline (chiziqli) grafik — 7 kunlik sotuv
+// ─────────────────────────────────────────────────────────────
+(function initSparkline() {
+    const ctx = document.getElementById('sparklineChart');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sparklineData.labels,
+            datasets: [{
+                label: 'Sotuv',
+                data: sparklineData.values,
+                borderColor: '#3b82f6',           // Asosiy chiziq rangi
+                backgroundColor: 'rgba(59,130,246,0.10)', // To'ldirish rangi
+                borderWidth: 2,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: '#3b82f6',
+                fill: true,
+                tension: 0.4,                     // Chiziq egriligi
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },       // Legendani yashiramiz (minimal ko'rinish)
+                tooltip: {
+                    callbacks: {
+                        // Tooltip da so'm belgisi qo'shamiz
+                        label: function(ctx) {
+                            const v = ctx.parsed.y;
+                            return ' ' + Number(v).toLocaleString('ru-RU') + ' so\'m';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },     // X o'qi chiziqlarini yashiramiz
+                    ticks: {
+                        color: '#94a3b8',
+                        font: { size: 11 }
+                    },
+                    border: { display: false }
+                },
+                y: {
+                    grid: { display: false },     // Y o'qi chiziqlarini yashiramiz
+                    ticks: { display: false },    // Y o'qi raqamlarini yashiramiz
+                    border: { display: false }
+                }
+            }
+        }
+    });
+})();
+
+// ─────────────────────────────────────────────────────────────
+// 2. Donut (halqa) grafik — kategoriyalar ulushi
+// ─────────────────────────────────────────────────────────────
+(function initDonut() {
+    const ctx = document.getElementById('donutChart');
+    if (!ctx) return;
+
+    // Har bir kategoriyaga rang tayinlaymiz
+    const colors = donutData.labels.map((_, i) => PALETTE[i % PALETTE.length]);
+
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: donutData.labels,
+            datasets: [{
+                data: donutData.values,
+                backgroundColor: colors,
+                borderColor: '#ffffff',
+                borderWidth: 2,
+                hoverOffset: 6,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '62%',                        // Halqa qalinligi
+            plugins: {
+                legend: { display: false },       // O'zimiz qo'lda legend yasaymiz
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = total > 0
+                                ? ((ctx.parsed / total) * 100).toFixed(1)
+                                : '0.0';
+                            return ' ' + Number(ctx.parsed).toLocaleString('ru-RU') + ' so\'m (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Donut legendasini qo'lda yasaymiz
+    const legendEl = document.getElementById('donutLegend');
+    if (legendEl && donutData.labels.length > 0) {
+        const total = donutData.values.reduce((a, b) => a + b, 0);
+        donutData.labels.forEach(function(label, i) {
+            const pct = total > 0
+                ? ((donutData.values[i] / total) * 100).toFixed(1)
+                : '0.0';
+            const item = document.createElement('div');
+            item.className = 'donut-legend-item';
+            item.innerHTML =
+                '<div class="donut-legend-dot" style="background:' + colors[i] + ';"></div>' +
+                '<span>' + label + ' <span style="color:var(--text-muted);">(' + pct + '%)</span></span>';
+            legendEl.appendChild(item);
+        });
+    }
+})();
+
+// ─────────────────────────────────────────────────────────────
+// Lucide ikonalarini yangi qo'shilgan elementlar uchun qayta ishga tushiramiz
+// (base.html da allaqachon chaqirilgan, lekin block extra_js keyin yuklanadi)
+// ─────────────────────────────────────────────────────────────
+if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+}
+</script>
+{% endblock %}

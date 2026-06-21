@@ -1,0 +1,190 @@
+{% extends 'core/base.html' %}
+{% block title %}Sozlamalar — Zakaz Panel{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-6); }
+.page-title { font-size:var(--text-2xl); font-weight:var(--weight-bold); color:var(--text-strong); }
+
+/* Alert */
+.ds-alert { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-4); border-radius:var(--radius-md); font-size:var(--text-sm); font-weight:var(--weight-medium); margin-bottom:var(--space-5); }
+.ds-alert svg { width:16px; height:16px; flex-shrink:0; }
+.ds-alert-success { background:var(--success-soft); color:var(--success-text); border:1px solid var(--success); }
+
+/* Rules grid */
+.rules-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); margin-bottom:var(--space-5); }
+
+/* Rule card */
+.rule-card { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); overflow:hidden; }
+.rule-card-head { padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--border-subtle); display:flex; align-items:flex-start; gap:var(--space-3); }
+.rule-icon { width:36px; height:36px; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.rule-icon svg { width:17px; height:17px; }
+.tone-danger  .rule-icon { background:var(--danger-soft);  color:var(--danger); }
+.tone-warning .rule-icon { background:var(--warning-soft); color:var(--warning); }
+.tone-info    .rule-icon { background:var(--info-soft);    color:var(--info); }
+.tone-success .rule-icon { background:var(--success-soft); color:var(--success); }
+.rule-head-text {}
+.rule-label { font-size:var(--text-base); font-weight:var(--weight-bold); color:var(--text-strong); }
+.rule-desc  { font-size:var(--text-xs); color:var(--text-muted); margin-top:2px; line-height:1.4; }
+
+.rule-body { padding:var(--space-4) var(--space-5); display:flex; flex-direction:column; gap:var(--space-3); }
+.rule-field { display:grid; grid-template-columns:1fr auto; align-items:center; gap:var(--space-3); }
+.rule-field-label { font-size:var(--text-sm); color:var(--text-body); font-weight:var(--weight-medium); }
+.rule-input-wrap { display:flex; align-items:center; gap:var(--space-2); }
+.rule-input {
+    width: 90px;
+    padding: 7px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--text-strong);
+    background: var(--surface-sunken);
+    border: 1.5px solid var(--border-default);
+    border-radius: var(--radius-md);
+    outline: none;
+    text-align: center;
+    box-sizing: border-box;
+}
+.rule-input:focus { border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px var(--accent-soft); }
+.rule-unit { font-size:var(--text-xs); color:var(--text-muted); font-weight:var(--weight-semibold); width:28px; }
+
+/* System card */
+.sys-card { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); padding:var(--space-5); display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--space-5); }
+.sys-card-info {}
+.sys-card-label { font-size:var(--text-base); font-weight:var(--weight-bold); color:var(--text-strong); }
+.sys-card-desc  { font-size:var(--text-sm); color:var(--text-muted); margin-top:2px; }
+
+/* Toggle switch */
+.toggle-wrap { display:flex; align-items:center; gap:var(--space-3); }
+.toggle-label-text { font-size:var(--text-sm); font-weight:var(--weight-semibold); }
+.toggle { position:relative; display:inline-block; width:44px; height:24px; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-slider {
+    position:absolute; cursor:pointer; inset:0;
+    background:var(--slate-300); border-radius:var(--radius-pill);
+    transition:background 0.2s;
+}
+.toggle-slider::before {
+    content:''; position:absolute;
+    width:18px; height:18px; left:3px; bottom:3px;
+    background:#fff; border-radius:50%;
+    transition:transform 0.2s;
+    box-shadow:var(--shadow-xs);
+}
+.toggle input:checked + .toggle-slider { background:var(--danger); }
+.toggle input:checked + .toggle-slider::before { transform:translateX(20px); }
+
+/* Footer actions */
+.form-footer { display:flex; align-items:center; justify-content:flex-end; gap:var(--space-3); }
+.ds-btn { display:inline-flex; align-items:center; gap:6px; padding:10px 22px; font-family:var(--font-sans); font-size:var(--text-sm); font-weight:var(--weight-semibold); border-radius:var(--radius-md); border:none; cursor:pointer; transition:background 0.15s; text-decoration:none; }
+.ds-btn-primary { background:var(--accent); color:#fff; }
+.ds-btn-primary:hover { background:var(--accent-hover); color:#fff; }
+.ds-btn svg { width:15px; height:15px; }
+
+/* ── Mobile (telefon) — max-width:640px ── */
+@media (max-width: 640px) {
+    .page-title { font-size: var(--text-xl); }
+
+    /* Rules grid — 1 ustun */
+    .rules-grid { grid-template-columns: 1fr !important; }
+
+    /* Sys card — vertikal */
+    .sys-card { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
+    .toggle-wrap { width: 100%; justify-content: space-between; }
+
+    /* Rule field — input to'liq kenglik */
+    .rule-field { grid-template-columns: 1fr; align-items: stretch; gap: var(--space-2); }
+    .rule-input-wrap { justify-content: flex-start; }
+    .rule-input { width: 100%; }
+    .rule-unit { width: auto; }
+
+    /* Footer — tugma to'liq kenglik */
+    .form-footer { justify-content: stretch; }
+    .form-footer .ds-btn { width: 100%; justify-content: center; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+    <div class="page-title">Sozlamalar</div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="ds-alert ds-alert-success">
+        <svg data-lucide="check-circle"></svg>
+        {{ message }}
+    </div>
+    {% endfor %}
+{% endif %}
+
+<form method="post" action="{% url 'panel_settings:update' %}">
+    {% csrf_token %}
+
+    <!-- Tizim holati -->
+    <div class="sys-card">
+        <div class="sys-card-info">
+            <div class="sys-card-label">Tizim holati (Global Lock)</div>
+            <div class="sys-card-desc">
+                Yoqilganda barcha oddiy foydalanuvchilar bot ga kira olmaydi.
+                Faqat Super Admin ishlaydi.
+            </div>
+        </div>
+        <div class="toggle-wrap">
+            <span class="toggle-label-text" style="color:var(--success-text);">Ochiq</span>
+            <label class="toggle">
+                <input type="checkbox" name="global_lock" {% if global_lock %}checked{% endif %}>
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label-text" style="color:var(--danger-text);">Yopiq</span>
+        </div>
+    </div>
+
+    <!-- OBR Qoidalar: 2×2 grid -->
+    <div class="rules-grid">
+        {% for group in groups %}
+        <div class="rule-card tone-{{ group.tone }}">
+            <div class="rule-card-head">
+                <div class="rule-icon">
+                    <svg data-lucide="{{ group.icon }}"></svg>
+                </div>
+                <div class="rule-head-text">
+                    <div class="rule-label">{{ group.label }}</div>
+                    <div class="rule-desc">{{ group.desc }}</div>
+                </div>
+            </div>
+            <div class="rule-body">
+                {% for field in group.fields %}
+                <div class="rule-field">
+                    <label class="rule-field-label" for="{{ field.name }}">{{ field.label }}</label>
+                    <div class="rule-input-wrap">
+                        <input
+                            type="number"
+                            step="any"
+                            id="{{ field.name }}"
+                            name="{{ field.name }}"
+                            value="{{ field.value }}"
+                            class="rule-input"
+                        >
+                        <span class="rule-unit">{{ field.unit }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Saqlash -->
+    <div class="form-footer">
+        <button type="submit" class="ds-btn ds-btn-primary">
+            <svg data-lucide="save"></svg>
+            Saqlash
+        </button>
+    </div>
+
+</form>
+
+{% endblock %}

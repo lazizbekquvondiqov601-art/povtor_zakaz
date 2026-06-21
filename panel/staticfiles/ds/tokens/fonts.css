@@ -1,0 +1,7 @@
+/* ============================================================
+   Zakaz Panel — Webfonts
+   Loaded from Google Fonts CDN. Manrope = UI/headings/body,
+   JetBrains Mono = tabular numbers, IDs, code.
+   NOTE: substitute self-hosted .woff2 if offline hosting needed.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');

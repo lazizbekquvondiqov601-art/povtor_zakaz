@@ -13,6 +13,7 @@ from aiogram import Bot, Router, F
 
 import src.database.db_manager as db_manager
 import auto_zakaz
+from data_normalizer import safe_normalize
 
 router = Router()
 TASHKENT_TZ = timezone(timedelta(hours=5))
@@ -29,12 +30,13 @@ def search_suppliers_by_name(query: str) -> list[str]:
                 "SELECT DISTINCT \"Поставщик\" FROM d_mahsulotlar WHERE \"Поставщик\" IS NOT NULL AND TRIM(\"Поставщик\") != ''"
             )).fetchall()
 
-            query_clean = query.strip().lower()
+            # NBSP, qo'sh bo'shliq va leading/trailing bo'shliqlarni tozalash
+            query_clean = (safe_normalize(query) or "").lower()
             results = []
 
             for (name,) in all_suppliers:
                 if not name: continue
-                name_clean = name.strip().lower()
+                name_clean = (safe_normalize(name) or "").lower()
                 if query_clean in name_clean:
                     results.append((0, name))
                     continue

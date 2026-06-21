@@ -24,7 +24,8 @@ def build_caption(article, group, first, color_type, pending_df=None):
         except: price_str = '0'
         caption += f"👤 {first.get('supplier', '-')}\n💵 {price_str} so'm\n"
     elif color_type in ('yellow', 'red'):
-        caption += f"({first.get('supplier', 'Noma\u02bclum')})\n"
+        _unknown = 'Noma\u02bclum'
+        caption += f"({first.get('supplier', _unknown)})\n"
 
     for shop, s_group in group.groupby('shop'):
         caption += f"\n🏪 <b>{shop}:</b>"

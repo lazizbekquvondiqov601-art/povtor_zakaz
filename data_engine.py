@@ -1,4 +1,4 @@
-﻿# data_engine.py
+# data_engine.py
 import math
 
 from datetime import datetime, timedelta, timezone
@@ -14,6 +14,7 @@ import warnings
 import src.database.db_manager as db_manager
 
 import config
+from data_normalizer import normalize_dataframe, safe_normalize, canonical_form
 
 
 TASHKENT_TZ = timezone(timedelta(hours=5))
@@ -86,6 +87,14 @@ def process_and_clean_sales_chunk(chunk_of_records):
     if 'product_id' in df_clean.columns and 'Магазин' in df_clean.columns:
         df_clean['ProductShop_Key'] = df_clean['product_id'].astype(str) + '_' + df_clean['Магазин'].astype(str)
 
+    # --- NORMALIZE: case/space duplikatlarni oldini olish ---
+    # Категория, Подкатегория, Вид, Материал, Акция -> canonical_form (case unified)
+    # Магазин, Наименование -> faqat safe_normalize
+    normalize_dataframe(df_clean, columns=[
+        'Категория', 'Подкатегория', 'Вид', 'Материал', 'Акция',
+        'Наименование', 'Магазин',
+    ])
+
     return df_clean
 
 def process_and_clean_stock_chunk(chunk_of_records, report_date_str):
@@ -108,14 +117,24 @@ def process_and_clean_stock_chunk(chunk_of_records, report_date_str):
         df['Вид'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Вид'))
         df['Пол'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Пол'))
         df['Размер сетка'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Размер сетка'))
+        df['Дата2'] = df['product_custom_fields'].apply(lambda x: extract_custom_field(x, 'Дата'))
         df = df.drop(columns=['product_custom_fields'])
+
+    # --- SCHEMA GUARD: jadval to'liq DROP + reload bo'lganda ham ustunlar yaratilishi shart ---
+    # Agar API javobida 'product_custom_fields' yoki 'last_import' bo'lmasa,
+    # bu ustunlar DataFrame'da yo'q bo'lib qoladi, va to_sql ularni jadvalga qo'shmaydi.
+    # Shu sababli Дата2 hech qachon saqlanmaydi. Bu yerda ularni majburiy NULL bilan to'ldiramiz.
+    for guard_col in ('Подкатегория', 'Материал', 'Вид', 'Пол', 'Размер сетка', 'Дата2', 'last_import'):
+        if guard_col not in df.columns:
+            df[guard_col] = None
 
     column_mapping = {
         'product_id': 'product_id', 'categories_path': 'Категория', 'product_name': "Наименование",
         'product_sku': 'Артикул', 'product_barcode': 'Баркод', 'shop_name': 'Магазин',
-        'measurement_value': 'Кол-во', # <-- Krilcha 'Кол-во' to'g'rilandi
+        'measurement_value': 'Кол-во',
         'supply_price': 'Цена поставки', 'retail_price': 'Цена продажи',
-        'estimated_income': 'Сумма прибыли остатков', "product_brand_name": "Бренд"
+        'estimated_income': 'Сумма прибыли остатков', "product_brand_name": "Бренд",
+        'last_import': 'last_import',
     }
     df = df.rename(columns=column_mapping)
 
@@ -123,8 +142,9 @@ def process_and_clean_stock_chunk(chunk_of_records, report_date_str):
         df['Категория'] = df['Категория'].apply(lambda x: x[0] if isinstance(x, list) and len(x) > 0 else None)
 
     required_columns = [
-        'product_id', 'Бренд', 'Категория', 'Материал', 'Вид', "Наименование", 'Дата', 'Артикул', 'Подкатегория',
-        'Баркод', 'Магазин', 'Кол-во', 'Цена поставки', 'Цена продажи', 'Сумма прибыли остатков', 'Пол','Размер сетка' # <-- Krilcha 'Кол-во' to'g'rilandi
+        'product_id', 'Бренд', 'Категория', 'Материал', 'Вид', "Наименование", 'Дата', 'Дата2', 'last_import',
+        'Артикул', 'Баркод', 'Магазин', 'Кол-во', 'Цена поставки', 'Цена продажи', 'Сумма прибыли остатков',
+        'Пол', 'Размер сетка',
     ]
     existing_columns = [col for col in required_columns if col in df.columns]
     df_clean = df[existing_columns].copy()
@@ -137,6 +157,12 @@ def process_and_clean_stock_chunk(chunk_of_records, report_date_str):
 
     if 'product_id' in df_clean.columns and 'Магазин' in df_clean.columns:
         df_clean['ProductShop_Key'] = df_clean['product_id'].astype(str) + '_' + df_clean['Магазин'].astype(str)
+
+    # --- NORMALIZE: case/space duplikatlarni oldini olish ---
+    normalize_dataframe(df_clean, columns=[
+        'Категория', 'Подкатегория', 'Вид', 'Материал', 'Пол',
+        'Наименование', 'Магазин',
+    ])
 
     return df_clean
 def get_billz_access_token():
@@ -227,9 +253,19 @@ def update_catalog(access_token, engine):
     def get_supplier_name(suppliers):
         return suppliers[0].get("name", "") if suppliers else ""
 
+    _shops_set = set(s.strip() for s in (config.ALL_SHOPS_IDS or '').split(',') if s.strip())
+
     for p in all_products:
         shop_prices = p.get('shop_prices', [])
         first_shop = shop_prices[0] if shop_prices else {}
+
+        # Bizning do'konlardagi max promo_price (aksiya narxi)
+        promo_prices = [
+            sp.get('promo_price') or 0
+            for sp in shop_prices
+            if sp.get('shop_id') in _shops_set
+        ]
+        promo_price_val = max(promo_prices) if promo_prices else (first_shop.get('promo_price') or 0)
         
         # --- SIZ YOZGAN BARCODE TOZALASH (Matn sifatida) ---
         raw_barcode = str(p.get('barcode', '') or '')
@@ -264,8 +300,9 @@ def update_catalog(access_token, engine):
                     'import_date': get_field(p.get('custom_fields'), 'import_date'),
                     'Цвет': get_field(p.get('custom_fields'), 'Цвет'),
                     'Поставщик': get_supplier_name(p.get("suppliers")),
-                    'Цена продажи': first_shop.get('retail_price', 0), 
+                    'Цена продажи': first_shop.get('retail_price', 0),
                     'supply_price': first_shop.get('supply_price', 0),
+                    'promo_price':  promo_price_val,
                     
                     # 🟢 YANGI QO'SHILGAN USTUNLAR 🟢
                     'Пол': get_field(p.get('custom_fields'), 'Пол'),
@@ -287,10 +324,46 @@ def update_catalog(access_token, engine):
         
         # Takroriylarni ID bo'yicha olib tashlash
         d_mahsulotlar.drop_duplicates(subset=['product_id'], keep='first', inplace=True)
-        
+
+        # --- NORMALIZE: katalog ustunlarini standartlashtirish ---
+        # Kategoriya tipidagi ustunlar canonical formga keladi (case unified),
+        # Цвет/Поставщик/Наименование faqat trim/NBSP tozalanadi.
+        normalize_dataframe(d_mahsulotlar, columns=[
+            'Категория', 'Подкатегория', 'Вид', 'Материал', 'Акция',
+            'Пол', 'Сезон',
+            'Цвет', 'Поставщик', 'Наименование', 'Бренд',
+        ])
+
         # SQLite ga yozish
         d_mahsulotlar.to_sql("d_mahsulotlar", engine, if_exists="replace", index=False)
         print(f"✅ 'd_mahsulotlar' jadvali {len(d_mahsulotlar)} ta UNIKAL tovar bilan yangilandi.")
+
+        # to_sql(replace) jadval sxemasini qayta yaratadi — qo'shimcha ustunlar qo'shilsin
+        for _col_stmt in [
+            'ALTER TABLE d_mahsulotlar ADD COLUMN promo_price REAL DEFAULT 0',
+        ]:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(_col_stmt))
+            except Exception:
+                pass
+
+        # --- API 500 FALLBACK: tushib qolgan mahsulotlarni avtomatik tiklash ---
+        try:
+            with engine.connect() as conn:
+                missing_count = conn.execute(text("""
+                    SELECT COUNT(DISTINCT product_id) FROM (
+                        SELECT product_id FROM f_sotuvlar WHERE product_id IS NOT NULL
+                        UNION
+                        SELECT product_id FROM f_qoldiqlar WHERE product_id IS NOT NULL
+                    ) fact
+                    WHERE product_id NOT IN (SELECT product_id FROM d_mahsulotlar WHERE product_id IS NOT NULL)
+                """)).scalar() or 0
+            if missing_count > 0:
+                print(f"⚠️ API 500 fallback: {missing_count} ta mahsulot katalogdan tushdi — sync_missing_products ishga tushadi...")
+                sync_missing_products(engine)
+        except Exception as _fe:
+            print(f"⚠️ API fallback tekshirishda xatolik: {_fe}")
 
 
 def update_sales(access_token, engine):
@@ -481,12 +554,11 @@ def update_stock(access_token, engine):
 def sync_missing_products(engine):
     print("\n--- 3.5-QADAM: YETISHMAYOTGAN MAHSULOTLARNI TIKLASH (Missing Products) ---")
     try:
-        # Barcha jadvallarni o'qiymiz
-        d_mahsulotlar = pd.read_sql("SELECT * FROM d_mahsulotlar", engine)
-        f_sotuvlar = pd.read_sql("SELECT * FROM f_sotuvlar", engine)
-        f_qoldiqlar = pd.read_sql("SELECT * FROM f_qoldiqlar", engine)
+        with engine.connect() as conn:
+            d_mahsulotlar = pd.read_sql("SELECT * FROM d_mahsulotlar", conn)
+            f_sotuvlar    = pd.read_sql("SELECT * FROM f_sotuvlar", conn)
+            f_qoldiqlar   = pd.read_sql("SELECT * FROM f_qoldiqlar", conn)
 
-        # ID larni tozalash va bir xil formatga (kichik harf, probelsiz) keltirish
         def clean_product_id(df):
             if "product_id" in df.columns:
                 df["product_id"] = df["product_id"].astype(str).str.strip().str.lower()
@@ -496,27 +568,86 @@ def sync_missing_products(engine):
         f_qoldiqlar = clean_product_id(f_qoldiqlar)
         d_mahsulotlar = clean_product_id(d_mahsulotlar)
 
-        # Qoldiq va Sotuvdagi jami unikal ID lar
+        # Дата2 (I-05.06.2026) → import_date (DD.MM.YYYY) konvertatsiya
+        def dата2_to_import_date(val):
+            if not val or not isinstance(val, str):
+                return None
+            val = val.strip()
+            # Harf prefix ni kesib tashlaymiz: "I-05.06.2026" → "05.06.2026"
+            date_part = val.split('-', 1)[-1].strip() if '-' in val else val
+            if len(date_part) == 10 and date_part[2] == '.' and date_part[5] == '.':
+                return date_part
+            return None
+
+        # product_id → import_date xaritasini tuzamiz (qoldiq + sotuv)
+        def build_import_map(df, date_col='Дата2'):
+            if date_col not in df.columns:
+                return {}
+            sub = df[['product_id', date_col]].dropna(subset=[date_col]).copy()
+            sub['_imp'] = sub[date_col].apply(dата2_to_import_date)
+            sub = sub.dropna(subset=['_imp']).drop_duplicates(subset=['product_id'], keep='first')
+            return dict(zip(sub['product_id'], sub['_imp']))
+
+        # Manba 1: qoldiq Дата2
+        id_to_import = build_import_map(f_qoldiqlar)
+        # Manba 2: sotuv Дата2
+        for pid, imp in build_import_map(f_sotuvlar).items():
+            if pid not in id_to_import:
+                id_to_import[pid] = imp
+        # Manba 3: d_mahsulotlar.Дата1 (API 500 fallback — katalogdan tushib qolganlar uchun)
+        for pid, imp in build_import_map(d_mahsulotlar, date_col='Дата1').items():
+            if pid not in id_to_import:
+                id_to_import[pid] = imp
+        # Manba 4: mavjud import_date larni ham xaritaga qo'shamiz (NULL bo'lmaganlar)
+        if 'import_date' in d_mahsulotlar.columns:
+            existing = d_mahsulotlar[['product_id', 'import_date']].dropna(subset=['import_date']).copy()
+            existing = existing[existing['import_date'].astype(str).str.strip().isin(['', 'None', 'nan']) == False]
+            for pid, imp in zip(existing['product_id'], existing['import_date']):
+                if pid not in id_to_import:
+                    id_to_import[pid] = str(imp).strip()
+
+        print(f"📅 Jami import_date manbalar: {len(id_to_import)} ta (qoldiq+sotuv Дата2 + Дата1)")
+
+        fixed_count = 0
+
+        # --- 1) Mavjud NULL import_date larni tuzatish ---
+        # Agar import_date ustuni umuman yo'q bo'lsa, uni yaratamiz
+        if 'import_date' not in d_mahsulotlar.columns:
+            d_mahsulotlar['import_date'] = None
+
+        # NULL/bo'sh import_date qatorlarini topamiz (NaN, None, 'nan', 'None', '' barchasini hisobga olamiz)
+        imp_str = d_mahsulotlar['import_date'].astype(str).str.strip().str.lower()
+        null_mask = (
+            d_mahsulotlar['import_date'].isna() |
+            imp_str.isin(['', 'none', 'nan', 'nat', '<na>'])
+        )
+
+        # Vektorizatsiyalangan tuzatish (tezroq va aniqroq)
+        if null_mask.any() and id_to_import:
+            # Faqat NULL bo'lgan va id_to_import xaritasida mavjud bo'lgan qatorlarni tuzatamiz
+            has_mapping = d_mahsulotlar['product_id'].isin(id_to_import.keys())
+            update_mask = null_mask & has_mapping
+            if update_mask.any():
+                d_mahsulotlar.loc[update_mask, 'import_date'] = (
+                    d_mahsulotlar.loc[update_mask, 'product_id'].map(id_to_import)
+                )
+                fixed_count = int(update_mask.sum())
+                print(f"✅ {fixed_count} ta NULL import_date Дата2 orqali tuzatildi")
+
+        # --- 2) Yetishmayotgan product_id larni qo'shish ---
         sotuv_ids = set(f_sotuvlar["product_id"].dropna())
         qoldiq_ids = set(f_qoldiqlar["product_id"].dropna())
         fact_all_ids = sotuv_ids.union(qoldiq_ids)
-        
-        # Katalogdagi mavjud ID lar
         existing_ids = set(d_mahsulotlar["product_id"].dropna())
-
-        # Katalogda yo'q, lekin Sotuv/Qoldiqda borlar
         missing_ids = list(fact_all_ids - existing_ids)
-        print(f"❌ API xatosi sababli katalogdan tushib qolgan mahsulotlar: {len(missing_ids)} ta")
+        print(f"❌ Katalogdan tushib qolgan mahsulotlar: {len(missing_ids)} ta")
 
         if missing_ids:
-            # Yetishmayotganlarni Sotuv va Qoldiqdan ajratib olamiz
             sotuv_missing = f_sotuvlar[f_sotuvlar["product_id"].isin(missing_ids)].copy()
             qoldiq_missing = f_qoldiqlar[f_qoldiqlar["product_id"].isin(missing_ids)].copy()
             combined_missing = pd.concat([sotuv_missing, qoldiq_missing], ignore_index=True)
 
             missing_rows = pd.DataFrame()
-            
-            # d_mahsulotlar da qanday ustunlar bo'lsa, shularni shakllantiramiz
             for col in d_mahsulotlar.columns:
                 if col in combined_missing.columns:
                     missing_rows[col] = combined_missing[col]
@@ -524,20 +655,24 @@ def sync_missing_products(engine):
                     missing_rows[col] = None
 
             missing_rows["product_id"] = combined_missing["product_id"]
-            
-            # Takroriylarni tozalash
+
+            # import_date ni Дата2 dan to'g'ridan-to'g'ri o'rnatamiz
+            missing_rows['import_date'] = missing_rows['product_id'].map(id_to_import)
+
             missing_rows = missing_rows.drop_duplicates(subset=["product_id"], keep="first")
-            
-            # Asosiy jadvalga yopishtirish
             d_mahsulotlar = pd.concat([d_mahsulotlar, missing_rows], ignore_index=True)
             d_mahsulotlar = d_mahsulotlar.drop_duplicates(subset=["product_id"], keep="first")
 
-            # Bazani yangilash
             d_mahsulotlar.to_sql("d_mahsulotlar", engine, if_exists="replace", index=False)
-            print(f"✅ {len(missing_rows)} ta mahsulot Sotuv/Qoldiqdan olinib bazaga TIKLANDI!")
+            print(f"✅ {len(missing_rows)} ta mahsulot Sotuv/Qoldiqdan olinib tiklandi!")
+
+        elif 'import_date' in d_mahsulotlar.columns and fixed_count > 0:
+            d_mahsulotlar.to_sql("d_mahsulotlar", engine, if_exists="replace", index=False)
+            print(f"✅ d_mahsulotlar yangilandi ({fixed_count} ta import_date tuzatildi).")
+
         else:
             print("✅ Barcha mahsulotlar joyida, tiklashga hojat yo'q.")
-            
+
     except Exception as e:
         print(f"⚠️ Tiklashda xatolik: {e}")
 
@@ -546,9 +681,6 @@ def analyze_and_generate_orders(engine):
 
     try:
         # 1. Jadvallarni o'qish (Eski kod bilan bir xil)
-        d_mahsulotlar = pd.read_sql("SELECT * FROM d_mahsulotlar", engine)
-        f_sotuvlar = pd.read_sql('SELECT product_id, "Магазин", "Продано за вычетом возвратов", "Дата" FROM f_sotuvlar', engine)
-        
         qoldiq_query = """
         SELECT t1.product_id, t1."Магазин", t1."Кол-во"
         FROM f_qoldiqlar t1
@@ -558,7 +690,10 @@ def analyze_and_generate_orders(engine):
             GROUP BY "Магазин"
         ) t2 ON t1."Магазин" = t2."Магазин" AND t1."Дата" = t2.max_date
         """
-        f_qoldiqlar = pd.read_sql(qoldiq_query, engine)
+        with engine.connect() as conn:
+            d_mahsulotlar = pd.read_sql("SELECT * FROM d_mahsulotlar", conn)
+            f_sotuvlar    = pd.read_sql('SELECT product_id, "Магазин", "Продано за вычетом возвратов", "Дата" FROM f_sotuvlar', conn)
+            f_qoldiqlar   = pd.read_sql(qoldiq_query, conn)
 
         # Formatlash
         f_sotuvlar['Магазин'] = f_sotuvlar['Магазин'].astype(str).str.strip()
@@ -573,7 +708,26 @@ def analyze_and_generate_orders(engine):
         
         date_col = 'import_date' if 'import_date' in d_mahsulotlar.columns else 'Дата1'
         d_mahsulotlar['import_sana_dt'] = pd.to_datetime(d_mahsulotlar[date_col], errors='coerce', dayfirst=True)
-        d_mahsulotlar['import_sana_dt'] = d_mahsulotlar['import_sana_dt'].fillna(datetime.now())
+
+        # --- NULL import_date MUAMMOSI ---
+        # Ilgari: .fillna(datetime.now()) -> days_passed=0 -> hech qaysi OBR sharti (m1-m4)
+        # bajarilmaydi -> zakaz generatsiya bo'lmaydi va hech qanday log yo'q.
+        # Yangi yondashuv: NULL import_date — bu "sanasi noma'lum, eski tovar" degani.
+        # Shu sababli ularni 3 yil oldingi sentinel sana bilan to'ldiramiz — bu days_passed ni
+        # katta qiladi va m1 sharti (kun >= 15) bajariladi, ya'ni tovar zakaz hisobiga kiradi.
+        # Qaysi product_id/Артикул NULL bo'lganini diagnostika uchun log qilamiz.
+        null_import_mask = d_mahsulotlar['import_sana_dt'].isna()
+        null_import_count = int(null_import_mask.sum())
+        if null_import_count > 0:
+            sentinel_date = datetime.now() - timedelta(days=3 * 365)
+            missing = d_mahsulotlar.loc[null_import_mask, ['product_id', 'Артикул']]
+            print(f"⚠️ {null_import_count} ta mahsulotda import_date NULL — eski tovar deb sentinel sana ({sentinel_date.strftime('%d.%m.%Y')}) qo'yildi:")
+            for _pid, _art in zip(missing['product_id'].tolist()[:50], missing['Артикул'].tolist()[:50]):
+                print(f"    NULL import_date: product_id={_pid} | Артикул={_art}")
+            if null_import_count > 50:
+                print(f"    ... va yana {null_import_count - 50} ta (jami {null_import_count} ta)")
+            d_mahsulotlar.loc[null_import_mask, 'import_sana_dt'] = sentinel_date
+
         d_mahsulotlar['Цвет'] = d_mahsulotlar['Цвет'].fillna('No Color')
         
         settings = db_manager.get_all_settings()
@@ -592,7 +746,9 @@ def analyze_and_generate_orders(engine):
     # 🟢 1-BOSQICH: "YASHIL" REJIM (Podkategoriya + Artikul + Rang + Magazin)
     # ---------------------------------------------------------
     try:
-        pending_orders = pd.read_sql("SELECT * FROM generated_orders WHERE status = 'Topdim'", engine)
+        with engine.connect() as conn:
+            pending_orders = pd.read_sql("SELECT * FROM generated_orders WHERE status = 'Topdim'", conn)
+            conn.close()
         
         if not pending_orders.empty:
             # Hozirgi qoldiqni olish (Endi Podkategoriyani ham qo'shib birlashtiramiz)
@@ -753,7 +909,8 @@ def analyze_and_generate_orders(engine):
     # ---------------------------------------------------------
     
     # Bazadagi 'Topdim' statusli zakazlarni olamiz
-    active_orders = pd.read_sql("SELECT * FROM generated_orders WHERE status = 'Topdim'", engine)
+    with engine.connect() as conn:
+        active_orders = pd.read_sql("SELECT * FROM generated_orders WHERE status = 'Topdim'", conn)
     
     rename_map = {
         'Артикул': 'zakaz_id',
@@ -834,6 +991,15 @@ def run_full_update():
     try:
         engine = db_manager.engine
 
+        update_catalog(access_token, engine)
+        update_sales(access_token, engine)
+        update_stock(access_token, engine)
+
+        # ALTER TABLE'lar update_stock'dan KEYIN ishlashi shart, chunki to'liq DROP'dan keyin
+        # jadvallar faqat to_sql() chaqirig'idan keyin yaratiladi. Aks holda "no such table"
+        # xatosi yuz beradi va ustunlar qo'shilmaydi. Agar ustun allaqachon mavjud bo'lsa
+        # (process_and_clean_stock_chunk schema guard tufayli), ALTER TABLE xato beradi va
+        # except bloki uni yutib yuboradi — bu bezarar.
         try:
             with engine.begin() as conn:
                 conn.execute(text('ALTER TABLE f_sotuvlar ADD COLUMN "Размер сетка" TEXT'))
@@ -842,10 +1008,14 @@ def run_full_update():
             with engine.begin() as conn:
                 conn.execute(text('ALTER TABLE f_qoldiqlar ADD COLUMN "Размер сетка" TEXT'))
         except Exception: pass
-
-        update_catalog(access_token, engine)
-        update_sales(access_token, engine)
-        update_stock(access_token, engine)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE f_qoldiqlar ADD COLUMN "Дата2" TEXT'))
+        except Exception: pass
+        try:
+            with engine.begin() as conn:
+                conn.execute(text('ALTER TABLE f_qoldiqlar ADD COLUMN "last_import" TEXT'))
+        except Exception: pass
         
         # MANA SHU QATOR QO'SHILISHI SHART! (Qolib ketgan tovarlarni tiklash uchun)
         sync_missing_products(engine)
@@ -858,3 +1028,7 @@ def run_full_update():
     end_time = time.time()
     duration_minutes = (end_time - start_time) / 60
     print(f"\n🏁 --- JARAYON YAKUNLANDI. Umumiy vaqt: {duration_minutes:.2f} daqiqa ---")
+    try:
+        db_manager.engine.dispose()
+    except Exception:
+        pass
