@@ -9,3 +9,7 @@ xlsxwriter
 openpyxl
 matplotlib
 numpy
+gunicorn
+whitenoise
+django>=4.0
+
