@@ -117,6 +117,11 @@
         }
         @keyframes zp-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .zp-topbar .icon-btn.refresh-btn:hover svg { animation: zp-spin 600ms ease; }
+        /* Billz sync tugmasi holati */
+        .zp-topbar .icon-btn.sync-btn.syncing svg { animation: zp-spin 1s linear infinite; color: #60a5fa; }
+        .zp-topbar .icon-btn.sync-btn.syncing { border-color: rgba(59,130,246,0.35); background: rgba(59,130,246,0.08); }
+        .zp-topbar .icon-btn.sync-btn.sync-done { border-color: rgba(34,197,94,0.35); background: rgba(34,197,94,0.08); color: #4ade80; }
+        .zp-topbar .icon-btn.sync-btn.sync-done svg { color: #4ade80; }
 
         .zp-topbar .topbar-divider {
             width: 1px; height: 22px;
@@ -495,6 +500,9 @@
 
     {% if user.is_authenticated %}
         <div class="topbar-actions">
+            <button type="button" class="icon-btn sync-btn" id="syncBtn" aria-label="Billz Sync" title="Billz dan ma'lumot yuklash">
+                <svg data-lucide="database"></svg>
+            </button>
             <button type="button" class="icon-btn refresh-btn" aria-label="Yangilash" title="Yangilash" onclick="window.location.reload()">
                 <svg data-lucide="refresh-cw"></svg>
             </button>
@@ -707,6 +715,69 @@ lucide.createIcons();
             }
         });
     });
+})();
+</script>
+
+<!-- Billz manual sync -->
+<script>
+(function () {
+    var btn = document.getElementById('syncBtn');
+    if (!btn) return;
+
+    var pollTimer = null;
+
+    function getCsrf() {
+        var m = document.cookie.match(/csrftoken=([^;]+)/);
+        return m ? m[1] : '';
+    }
+
+    function setState(state) {
+        btn.classList.remove('syncing', 'sync-done');
+        if (state === 'syncing') {
+            btn.classList.add('syncing');
+            btn.title = "Yuklanmoqda...";
+        } else if (state === 'done') {
+            btn.classList.add('sync-done');
+            // 3 soniyadan keyin normal holatga qaytadi
+            setTimeout(function () { btn.classList.remove('sync-done'); btn.title = "Billz dan ma'lumot yuklash"; }, 3000);
+        }
+    }
+
+    function checkStatus() {
+        fetch('/sync/status/')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.running) {
+                    setState('syncing');
+                    if (!pollTimer) pollTimer = setInterval(checkStatus, 3000);
+                } else {
+                    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                    if (d.last) { setState('done'); }
+                    else { setState(''); }
+                    if (d.last) btn.title = "Oxirgi sync: " + d.last;
+                }
+            })
+            .catch(function () {
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            });
+    }
+
+    btn.addEventListener('click', function () {
+        fetch('/sync/trigger/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrf() },
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d.status === 'started' || d.status === 'already_running') {
+                setState('syncing');
+                if (!pollTimer) pollTimer = setInterval(checkStatus, 3000);
+            }
+        });
+    });
+
+    // Sahifa ochilganda agar sync ishlayotgan bo'lsa ko'rsat
+    checkStatus();
 })();
 </script>
 

@@ -14,4 +14,7 @@ urlpatterns = [
     path('olik/', views.olik_tovarlar, name='olik'),
     # Telegram WebApp kirish nuqtasi
     path('webapp/', views.webapp_entry, name='webapp'),
+    # Billz manual sync
+    path('sync/trigger/', views.trigger_sync, name='sync_trigger'),
+    path('sync/status/',  views.sync_status,  name='sync_status'),
 ]

@@ -1,8 +1,10 @@
-import sys, json
+import sys, json, threading
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.shortcuts import render
 from django.utils import timezone
 from sqlalchemy import text as sa_text
@@ -109,6 +111,34 @@ def dashboard(request):
 def webapp_entry(request):
     """Telegram WebApp kirish nuqtasi. Browser orqali kirsa xato ko'rsatadi."""
     return render(request, 'core/webapp.html')
+
+
+# --- Billz manual sync ---
+_sync_state = {'running': False, 'last': None, 'error': None}
+
+def _run_sync():
+    import data_engine
+    _sync_state['running'] = True
+    _sync_state['error'] = None
+    try:
+        data_engine.run_full_update()
+        _sync_state['last'] = timezone.now().strftime('%d.%m %H:%M')
+    except Exception as e:
+        _sync_state['error'] = str(e)[:200]
+    finally:
+        _sync_state['running'] = False
+
+@login_required
+@require_POST
+def trigger_sync(request):
+    if _sync_state['running']:
+        return JsonResponse({'status': 'already_running'})
+    threading.Thread(target=_run_sync, daemon=True).start()
+    return JsonResponse({'status': 'started'})
+
+@login_required
+def sync_status(request):
+    return JsonResponse(_sync_state)
 
 
 def _fmt_frozen(v):
