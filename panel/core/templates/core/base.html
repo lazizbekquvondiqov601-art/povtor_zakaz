@@ -50,7 +50,7 @@
         .zp-topbar {
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 1000;
             /* Safe area: Telegram WebApp close/header button */
             height: calc(var(--topbar-height) + var(--tg-safe-area-inset-top, 0px));
             padding-top: var(--tg-safe-area-inset-top, 0px);
@@ -401,13 +401,22 @@
             .zp-burger { display: inline-flex; }
             .zp-topbar .topbar-center { display: none; }
             .zp-topbar .topbar-actions .icon-btn { display: none; }
+
+            /* Sidebar: topbar + Telegram close button ostidan boshlansin */
             .zp-sidebar {
-                position: fixed; top: 0; left: 0;
-                width: 280px; height: 100vh;
-                z-index: 500; overflow: hidden;
+                position: fixed;
+                top: calc(var(--topbar-height) + var(--tg-safe-area-inset-top, 0px));
+                left: 0;
+                width: 280px;
+                height: calc(100dvh - var(--topbar-height) - var(--tg-safe-area-inset-top, 0px));
+                z-index: 500;
+                overflow: hidden;
                 transform: translateX(-100%);
                 transition: transform 0.25s ease;
-                box-shadow: 0 12px 28px rgba(0,0,0,0.5);
+                box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+            }
+            .zp-sidebar .zp-brand {
+                padding-top: 14px; /* safe area endi yuqorida emas */
             }
             .zp-sidebar.open { transform: translateX(0); }
             .zp-main { padding: 12px; }
