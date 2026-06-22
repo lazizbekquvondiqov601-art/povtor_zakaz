@@ -17,4 +17,5 @@ urlpatterns = [
     # Billz manual sync
     path('sync/trigger/', views.trigger_sync, name='sync_trigger'),
     path('sync/status/',  views.sync_status,  name='sync_status'),
+    path('bot/webhook/', views.telegram_webhook, name='telegram_webhook'),
 ]

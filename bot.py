@@ -58,15 +58,21 @@ async def main():
     scheduler.start()
 
     print("🤖 Bot yangi modulli arxitektura bilan ishga tushdi...")
-    
-    # Super Adminni xabardor qilish
-    try:
-        await bot.send_message(config.SUPER_ADMIN_ID, "🚀 <b>Bot muvaffaqiyatli ishga tushdi!</b>\n\nBarcha modullar va xavfsizlik tizimi faol holatda. Kod to'liq tayyor.")
-    except Exception as e:
-        print(f"⚠️ Super adminga xabar yuborishda xatolik: {e}")
 
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    # Webhook o'rnatish
+    webhook_url = f"{config.WEB_URL}/bot/webhook/"
+    await bot.set_webhook(webhook_url, drop_pending_updates=True)
+    print(f"🔗 Webhook o'rnatildi: {webhook_url}")
+
+    # Super adminga xabar
+    try:
+        await bot.send_message(config.SUPER_ADMIN_ID, "🚀 Bot webhook rejimida ishga tushdi!")
+    except Exception as e:
+        print(f"⚠️ {e}")
+
+    # Polling yo'q — scheduler ishlaydi, jarayon tirik turadi
+    print("⏰ Scheduler ishlayapti, polling yo'q.")
+    await asyncio.sleep(float('inf'))
 
 if __name__ == "__main__":
     asyncio.run(main())

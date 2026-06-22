@@ -43,7 +43,7 @@ echo ">>> Gunicorn PORT=${PORT:-8000}..."
 cd "${APP_DIR}/panel"
 exec gunicorn panel_config.wsgi:application \
     --bind "0.0.0.0:${PORT:-8000}" \
-    --workers 2 \
+    --workers 1 \
     --timeout 120 \
     --access-logfile - \
     --error-logfile -

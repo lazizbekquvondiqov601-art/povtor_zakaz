@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
 from django.utils import timezone
 from sqlalchemy import text as sa_text
@@ -671,3 +672,40 @@ def olik_tovarlar(request):
         'page_range':       range(max(1, page - 2), min(total_pages + 1, page + 3)),
     }
     return render(request, 'core/olik.html', context)
+
+
+# --- Telegram Webhook ---
+_bot_ready = False
+
+@csrf_exempt
+async def telegram_webhook(request):
+    """Telegram webhook — bot handlerlarini Django orqali ishlatadi."""
+    global _bot_ready
+    if request.method != 'POST':
+        from django.http import HttpResponse as HR
+        return HR(status=405)
+    try:
+        if not _bot_ready:
+            from src.bot.init_bot import dp, bot, OBR_CACHE, STAT_CACHE
+            from src.bot.handlers import setup_handlers
+            from src.bot.middlewares.security import SecurityMiddleware
+            import supplier_analytics as sa
+            import src.database.db_manager as dbm
+            dbm.init_db()
+            dp.message.outer_middleware(SecurityMiddleware())
+            dp.callback_query.outer_middleware(SecurityMiddleware())
+            setup_handlers(dp)
+            sa.register_handlers(dp, bot, STAT_CACHE, OBR_CACHE)
+            _bot_ready = True
+
+        import json as _j
+        from aiogram.types import Update
+        from src.bot.init_bot import dp, bot
+        data = _j.loads(request.body)
+        update = Update.model_validate(data)
+        await dp.feed_update(bot=bot, update=update)
+    except Exception as e:
+        print(f"[webhook] {str(e)[:120]}")
+    from django.http import HttpResponse as HR
+    return HR('OK')
+
