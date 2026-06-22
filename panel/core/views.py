@@ -106,6 +106,11 @@ def dashboard(request):
     })
 
 
+def webapp_entry(request):
+    """Telegram WebApp kirish nuqtasi. Browser orqali kirsa xato ko'rsatadi."""
+    return render(request, 'core/webapp.html')
+
+
 def _fmt_frozen(v):
     """Muzlagan kapital formati: >=1mln bo'lsa 'X.Y mln', aks holda raqam."""
     try:

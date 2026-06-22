@@ -12,4 +12,6 @@ urlpatterns = [
     # Bosh sahifa — dashboard
     path('', views.dashboard, name='dashboard'),
     path('olik/', views.olik_tovarlar, name='olik'),
+    # Telegram WebApp kirish nuqtasi
+    path('webapp/', views.webapp_entry, name='webapp'),
 ]

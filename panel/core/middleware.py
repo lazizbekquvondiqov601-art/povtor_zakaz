@@ -13,7 +13,7 @@ class SuperAdminOnlyMiddleware:
     """Faqat tizimga kirgan foydalanuvchilarni o'tkazadi."""
 
     # Login qilmasdan ham ochiq bo'ladigan yo'llar
-    OPEN_PATHS = ('/login', '/static', '/admin/login')
+    OPEN_PATHS = ('/login', '/static', '/admin/login', '/webapp')
 
     def __init__(self, get_response):
         # get_response — keyingi middleware yoki view chaqiruvchi callable

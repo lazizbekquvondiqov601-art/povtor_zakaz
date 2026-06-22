@@ -149,6 +149,11 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
+# Session — 30 kun saqlanadi, brauzer yopilganda o'chmaydi
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_AGE = 30 * 24 * 60 * 60  # 30 kun (soniyada)
+SESSION_SAVE_EVERY_REQUEST = True        # har so'rovda muddatni yangilaydi
+
 # --- Parol tekshiruvi ---
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
