@@ -1199,7 +1199,7 @@ def get_all_suppliers_stats() -> pd.DataFrame:
         return merged
 
     except Exception as e:
-        print(f"get_all_suppliers_stats xatolik: {e}")
+        print(f"get_all_suppliers_stats xatolik: {str(e).split('[SQL:')[0].rstrip()}")
         return pd.DataFrame()
 
 

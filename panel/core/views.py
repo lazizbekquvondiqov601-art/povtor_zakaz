@@ -1,4 +1,4 @@
-import sys, json, threading
+import sys, json, threading, asyncio
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
@@ -676,9 +676,10 @@ def olik_tovarlar(request):
 
 # --- Telegram Webhook ---
 _bot_ready = False
+_webhook_loop = asyncio.new_event_loop()
 
 @csrf_exempt
-async def telegram_webhook(request):
+def telegram_webhook(request):
     """Telegram webhook — bot handlerlarini Django orqali ishlatadi."""
     global _bot_ready
     if request.method != 'POST':
@@ -698,14 +699,13 @@ async def telegram_webhook(request):
             sa.register_handlers(dp, bot, STAT_CACHE, OBR_CACHE)
             _bot_ready = True
 
-        import json as _j
         from aiogram.types import Update
         from src.bot.init_bot import dp, bot
-        data = _j.loads(request.body)
+        data = json.loads(request.body)
         update = Update.model_validate(data)
-        await dp.feed_update(bot=bot, update=update)
+        _webhook_loop.run_until_complete(dp.feed_update(bot=bot, update=update))
     except Exception as e:
-        print(f"[webhook] {str(e)[:120]}")
+        print(f"[webhook] {str(e)[:200]}")
     from django.http import HttpResponse as HR
     return HR('OK')
 

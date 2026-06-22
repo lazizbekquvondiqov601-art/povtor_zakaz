@@ -169,5 +169,5 @@ def calculate_auto_zakaz(engine) -> pd.DataFrame:
         return result_df.drop(columns=['Разmer_sort'])
 
     except Exception as e:
-        print(f"Auto_Zakaz xatolik: {e}")
+        print(f"Auto_Zakaz xatolik: {str(e).split('[SQL:')[0].rstrip()}")
         return pd.DataFrame()

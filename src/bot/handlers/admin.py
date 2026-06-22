@@ -98,6 +98,7 @@ async def auto_zakaz_click(message: Message):
 
 @router.callback_query(F.data.startswith("obrBackRoot_"))
 async def obr_back_root(callback: CallbackQuery):
+    await callback.answer()
     session_id = callback.data.split("_")[1]
     df = OBR_CACHE.get(session_id)
     if df is None:
@@ -127,6 +128,7 @@ async def obr_back_root(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("obrCat_"))
 async def obr_category_click(callback: CallbackQuery):
+    await callback.answer()
     _, session_id, cat_id = callback.data.split("_")
     df = OBR_CACHE.get(session_id)
     category = OBR_CACHE.get(f"cat_{cat_id}")
@@ -212,6 +214,7 @@ async def obr_subcategory_click(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("obrSegMenu_"))
 async def obr_seg_menu_click(callback: CallbackQuery):
+    await callback.answer()
     parts = callback.data.split("_")
     _, session_id, cat_id, sub_id, seg_id = parts
     seg_name = OBR_CACHE.get(f"seg_{seg_id}")
@@ -461,6 +464,7 @@ async def show_stock_dates(message: Message):
 
 @router.callback_query(F.data.startswith("stqDate_"))
 async def stock_date_click(callback: CallbackQuery):
+    await callback.answer()
     target_date = callback.data.split("stqDate_", 1)[1]
     categories = db_manager.get_stock_categories_on_date(target_date)
 
@@ -490,6 +494,7 @@ async def stock_date_click(callback: CallbackQuery):
 
 @router.callback_query(F.data == "back_to_stock_dates")
 async def back_to_stock_dates(callback: CallbackQuery):
+    await callback.answer()
     dates = db_manager.get_last_7_stock_dates()
     kb = []
     for d in dates:
@@ -507,6 +512,7 @@ async def back_to_stock_dates(callback: CallbackQuery):
 
 @router.callback_query(F.data.startswith("stqCat_"))
 async def stock_category_click(callback: CallbackQuery):
+    await callback.answer()
     uid = callback.data.split("_")[1]
     data = STAT_CACHE.get(uid)
 
