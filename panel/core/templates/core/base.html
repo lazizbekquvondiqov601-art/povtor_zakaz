@@ -397,29 +397,63 @@
             .zp-topbar .user-info { display: none; }
             .zp-topbar .topbar-divider { display: none; }
         }
+
+        /* ── Bottom nav (faqat mobile) ── */
+        .zp-bottom-nav { display: none; }
+
         @media (max-width: 640px) {
-            .zp-burger { display: inline-flex; }
             .zp-topbar .topbar-center { display: none; }
             .zp-topbar .topbar-actions .icon-btn { display: none; }
 
-            /* Sidebar: topbar + Telegram close button ostidan boshlansin */
-            .zp-sidebar {
+            /* Sidebar va burger mobileda yashirin — bottom nav ishlatiladi */
+            .zp-sidebar { display: none !important; }
+            .zp-burger { display: none !important; }
+
+            /* Main: pastki bottom nav uchun joy qoldirish */
+            .zp-main { padding: 12px 12px calc(12px + 60px + var(--tg-safe-area-inset-bottom, 0px)); }
+
+            /* Bottom navigation bar */
+            .zp-bottom-nav {
+                display: flex;
                 position: fixed;
-                top: calc(var(--topbar-height) + var(--tg-safe-area-inset-top, 0px));
-                left: 0;
-                width: 280px;
-                height: calc(100dvh - var(--topbar-height) - var(--tg-safe-area-inset-top, 0px));
-                z-index: 500;
-                overflow: hidden;
-                transform: translateX(-100%);
-                transition: transform 0.25s ease;
-                box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+                bottom: 0; left: 0; right: 0;
+                z-index: 900;
+                height: calc(60px + var(--tg-safe-area-inset-bottom, 0px));
+                padding-bottom: var(--tg-safe-area-inset-bottom, 0px);
+                background: linear-gradient(0deg, #0b1220 0%, #0f172a 100%);
+                border-top: 1px solid rgba(148,163,184,0.10);
+                box-shadow: 0 -8px 32px rgba(0,0,0,0.45);
+                align-items: stretch;
             }
-            .zp-sidebar .zp-brand {
-                padding-top: 14px; /* safe area endi yuqorida emas */
+            .zp-bottom-nav .bn-item {
+                flex: 1; min-width: 0;
+                display: flex; flex-direction: column;
+                align-items: center; justify-content: center;
+                gap: 3px;
+                color: #64748b;
+                text-decoration: none;
+                font-size: 9px; font-weight: 600;
+                letter-spacing: 0.05em; text-transform: uppercase;
+                padding: 8px 2px 6px;
+                transition: color 150ms ease;
+                position: relative;
             }
-            .zp-sidebar.open { transform: translateX(0); }
-            .zp-main { padding: 12px; }
+            .zp-bottom-nav .bn-item svg {
+                width: 20px; height: 20px; flex-shrink: 0;
+                transition: transform 150ms ease;
+            }
+            .zp-bottom-nav .bn-item:active { opacity: 0.7; }
+            .zp-bottom-nav .bn-item.active { color: #60a5fa; }
+            .zp-bottom-nav .bn-item.active svg { transform: scale(1.1); }
+            .zp-bottom-nav .bn-item.active::before {
+                content: "";
+                position: absolute; top: 0; left: 50%;
+                transform: translateX(-50%);
+                width: 28px; height: 2px;
+                border-radius: 0 0 3px 3px;
+                background: linear-gradient(90deg, #3b82f6, #60a5fa);
+                box-shadow: 0 0 8px rgba(59,130,246,0.5);
+            }
         }
     </style>
 
@@ -549,6 +583,34 @@
 
 </div>
 
+<!-- Bottom navigation (faqat mobile, < 640px) -->
+<nav class="zp-bottom-nav">
+    <a href="/" class="bn-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" title="Dashboard">
+        <svg data-lucide="layout-dashboard"></svg>
+        <span>Bosh</span>
+    </a>
+    <a href="/obr/" class="bn-item {% if 'obr' in request.path %}active{% endif %}" title="Asosiy Zakaz">
+        <svg data-lucide="package"></svg>
+        <span>Zakaz</span>
+    </a>
+    <a href="/supplier/" class="bn-item {% if 'supplier' in request.path %}active{% endif %}" title="Supplier">
+        <svg data-lucide="users"></svg>
+        <span>Supplier</span>
+    </a>
+    <a href="/analytics/" class="bn-item {% if 'analytics' in request.path %}active{% endif %}" title="Statistika">
+        <svg data-lucide="bar-chart-2"></svg>
+        <span>Tahlil</span>
+    </a>
+    <a href="/stock/" class="bn-item {% if 'stock' in request.path or 'olik' in request.path %}active{% endif %}" title="Ombor">
+        <svg data-lucide="archive"></svg>
+        <span>Ombor</span>
+    </a>
+    <a href="/settings/" class="bn-item {% if 'settings' in request.path %}active{% endif %}" title="Sozlamalar">
+        <svg data-lucide="settings"></svg>
+        <span>Tizim</span>
+    </a>
+</nav>
+
 <!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <!-- Chart.js -->
@@ -560,19 +622,14 @@ lucide.createIcons();
     var tg = window.Telegram && window.Telegram.WebApp;
     if (!tg) return;
 
+    // expand() — to'liq balandlik, fullscreen overlay muammosi yo'q
     tg.expand();
 
-    if (typeof tg.requestFullscreen === 'function' && !tg.isFullscreen) {
-        tg.requestFullscreen();
-    }
+    // Telegram header va background rangini dizaynimizga moslash
+    if (typeof tg.setHeaderColor === 'function') { tg.setHeaderColor('#0b1220'); }
+    if (typeof tg.setBackgroundColor === 'function') { tg.setBackgroundColor('#0b1220'); }
 
-    tg.onEvent('fullscreen_changed', function () {
-        if (!tg.isFullscreen && typeof tg.requestFullscreen === 'function') {
-            tg.requestFullscreen();
-        }
-    });
-
-    // Safe area — Telegram header / close button ustida qolmaslik uchun
+    // Safe area — bottom nav uchun pastki zona
     function applySafeArea() {
         var sa = tg.safeAreaInset || {};
         var csa = tg.contentSafeAreaInset || {};
