@@ -38,7 +38,7 @@ def _get_all_kats():
     try:
         return [r[0] for r in session.execute(sql).fetchall()]
     except (OperationalError, Exception) as e:
-        print(f"[analytics] _get_all_kats xatolik: {e}")
+        print(f"[analytics] _get_all_kats xatolik: " + str(e).split("[SQL:")[0].rstrip())
         return []
     finally:
         session.close()
@@ -56,7 +56,7 @@ def _get_all_subkats():
     try:
         return [r[0] for r in session.execute(sql).fetchall()]
     except (OperationalError, Exception) as e:
-        print(f"[analytics] _get_all_subkats xatolik: {e}")
+        print(f"[analytics] _get_all_subkats xatolik: " + str(e).split("[SQL:")[0].rstrip())
         return []
     finally:
         session.close()
@@ -209,7 +209,7 @@ def _build_table(start_date, end_date, kat_filters=None, subkat_filters=None):
                      for r in session.execute(sql_marja, params).fetchall()}
     except (OperationalError, Exception) as e:
         # Jadvallar yo'q (Railway da bot hali ma'lumot yuklamagan) — bo'sh natija
-        print(f"[analytics] _build_table xatolik: {e}")
+        print(f"[analytics] _build_table xatolik: " + str(e).split("[SQL:")[0].rstrip())
         as_rows, ak_rows = [], []
         q_as, q_ak, avg_as, marja_raw = {}, {}, {}, {}
     finally:

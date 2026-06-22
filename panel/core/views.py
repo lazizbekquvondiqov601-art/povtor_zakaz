@@ -221,7 +221,7 @@ def olik_tovarlar(request):
         df = pd.read_sql(sql_main, engine)
     except (OperationalError, Exception) as e:
         # Jadvallar yo'q (Railway da bot hali ma'lumot yuklamagan) — bo'sh jadval
-        print(f"[olik_tovarlar] sql_main xatolik: {e}")
+        print(f"[olik_tovarlar] sql_main xatolik: " + str(e).split("[SQL:")[0].rstrip())
         df = pd.DataFrame(columns=[
             'podkat', 'artikul', 'naimenovanie', 'foto', 'postavchik', 'pol',
             'rang', 'import_date', 'aksiya', 'qoldiq', 'tan_narxi',
@@ -242,7 +242,7 @@ def olik_tovarlar(request):
     try:
         df_s90 = pd.read_sql(sql_s90, engine)
     except (OperationalError, Exception) as e:
-        print(f"[olik_tovarlar] sql_s90 xatolik: {e}")
+        print(f"[olik_tovarlar] sql_s90 xatolik: " + str(e).split("[SQL:")[0].rstrip())
         df_s90 = pd.DataFrame(columns=['artikul', 'rang', 'sotuv_90', 'sotuv_summa'])
 
     # --- Merge sotuv_90 (artikul + rang bo'yicha) ---
@@ -387,7 +387,7 @@ def olik_tovarlar(request):
             try:
                 df_bc = pd.read_sql(sql_barcode, engine)
             except (OperationalError, Exception) as e:
-                print(f"[olik_tovarlar] sql_barcode xatolik: {e}")
+                print(f"[olik_tovarlar] sql_barcode xatolik: " + str(e).split("[SQL:")[0].rstrip())
                 df_bc = pd.DataFrame(columns=[
                     'podkat', 'artikul', 'naimenovanie', 'foto', 'rang', 'barcode',
                     'import_date', 'aksiya', 'qoldiq', 'tan_narxi',

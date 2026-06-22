@@ -13,6 +13,12 @@ from sqlalchemy import text
 import src.database.db_manager as db_manager
 
 
+def _err(fn, e):
+    """SQL kodi ko'rsatmasdan qisqa xatolik log."""
+    msg = str(e).split('[SQL:')[0].rstrip().rstrip('\n')
+    print(f"[dq:{fn}] {msg}")
+
+
 # ---------------------------------------------------------------------------
 # Yordamchi: 010/011 va Пакет% ni chiqarib tashlash uchun umumiy WHERE qismi
 # ---------------------------------------------------------------------------
@@ -129,7 +135,7 @@ def get_kpi_summary(engine):
 
     except Exception as e:
         # Xatolik bo'lsa standart nol qiymatlar qaytadi
-        print(f"[dashboard_queries] get_kpi_summary xatolik: {e}")
+        _err('kpi_summary', e)
     finally:
         session.close()
 
@@ -204,7 +210,7 @@ def get_urgent_orders(engine, limit=10):
         ]
 
     except Exception as e:
-        print(f"[dashboard_queries] get_urgent_orders xatolik: {e}")
+        _err('urgent_orders', e)
         return []
     finally:
         session.close()
@@ -270,7 +276,7 @@ def get_sales_sparkline(engine, end_date=None):
         }
 
     except Exception as e:
-        print(f"[dashboard_queries] get_sales_sparkline xatolik: {e}")
+        _err('sales_sparkline', e)
         return standart
     finally:
         session.close()
@@ -315,7 +321,7 @@ def get_supplier_problems(engine, limit=5):
         ]
 
     except Exception as e:
-        print(f"[dashboard_queries] get_supplier_problems xatolik: {e}")
+        _err('supplier_problems', e)
         return []
     finally:
         session.close()
@@ -378,7 +384,7 @@ def get_category_donut(engine):
         return result
 
     except Exception as e:
-        print(f"[dashboard_queries] get_category_donut xatolik: {e}")
+        _err('category_donut', e)
         return []
     finally:
         session.close()
@@ -466,7 +472,7 @@ def get_mtd_marja(engine):
         }
 
     except Exception as e:
-        print(f"[dashboard_queries] get_mtd_marja xatolik: {e}")
+        _err('mtd_marja', e)
         return empty
     finally:
         session.close()
@@ -520,7 +526,7 @@ def get_dead_stock(engine, limit=15):
         ]
 
     except Exception as e:
-        print(f"[dashboard_queries] get_dead_stock xatolik: {e}")
+        _err('dead_stock', e)
         return []
     finally:
         session.close()
@@ -571,7 +577,7 @@ def get_supplier_rating(engine, limit=12):
         ]
 
     except Exception as e:
-        print(f"[dashboard_queries] get_supplier_rating xatolik: {e}")
+        _err('supplier_rating', e)
         return []
     finally:
         session.close()

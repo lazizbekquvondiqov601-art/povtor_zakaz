@@ -73,7 +73,7 @@ def settings_main(request):
     try:
         settings = db_manager.get_all_settings()
     except (OperationalError, ProgrammingError, DatabaseError, Exception) as e:
-        print(f"[settings_main] sozlamalarni olishda xatolik: {e}")
+        print(f"[settings_main] sozlamalarni olishda xatolik: " + str(e).split("[SQL:")[0].rstrip())
         settings = {}
 
     groups = []
@@ -128,7 +128,7 @@ def settings_update(request):
         messages.success(request, "Sozlamalar muvaffaqiyatli saqlandi!")
     except (OperationalError, ProgrammingError, DatabaseError, Exception) as e:
         # settings jadvali yo'q (bot hali init_db qilmagan) — sahifa qulamasin
-        print(f"[settings_update] saqlashda xatolik: {e}")
+        print(f"[settings_update] saqlashda xatolik: " + str(e).split("[SQL:")[0].rstrip())
         messages.error(
             request,
             "Sozlamalar saqlanmadi: ma'lumotlar bazasi hali tayyor emas. "
