@@ -40,14 +40,13 @@ def _get_obr_df(request):
     if request.GET.get('refresh'):
         request.session.pop('obr_df_json', None)
 
-    if 'obr_df_json' not in request.session:
+    if 'obr_df_json' not in request.session or not request.session.get('obr_df_json'):
         df = auto_zakaz.calculate_auto_zakaz(db_manager.engine)
         if not df.empty:
             request.session['obr_df_json'] = df.to_json(
                 orient='records', force_ascii=False
             )
-        else:
-            request.session['obr_df_json'] = ''
+        # Bo'sh natijani saqlamaymiz — keyingi requestda qayta urinadi
 
     raw = request.session.get('obr_df_json', '')
     if not raw:
