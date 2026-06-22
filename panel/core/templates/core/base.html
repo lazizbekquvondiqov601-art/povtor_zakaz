@@ -308,9 +308,25 @@
 <!-- Lucide icons init -->
 <script>
 lucide.createIcons();
-if (window.Telegram && window.Telegram.WebApp) {
-    window.Telegram.WebApp.expand();
-}
+(function () {
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (!tg) return;
+
+    // Har doim balandlikni maksimallashtir
+    tg.expand();
+
+    // Kompyuterda to'liq ekran (Telegram 8.0+)
+    if (typeof tg.requestFullscreen === 'function' && !tg.isFullscreen) {
+        tg.requestFullscreen();
+    }
+
+    // Agar foydalanuvchi fullscreendan chiqsa — qayta kirish
+    tg.onEvent('fullscreen_changed', function () {
+        if (!tg.isFullscreen && typeof tg.requestFullscreen === 'function') {
+            tg.requestFullscreen();
+        }
+    });
+})();
 </script>
 
 <!-- Mobile sidebar toggle -->
