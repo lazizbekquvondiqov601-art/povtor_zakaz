@@ -1,12 +1,10 @@
-# Railway "web" service konfiguratsiyasi.
-# DIQQAT: bu fayl WEB service uchun. Bot uchun ALOHIDA service yarating
-# va uning startCommand ini "python bot.py" qilib qo'ying (yoki Procfile
-# "worker" process ini tanlang).
+# Railway service konfiguratsiyasi.
+# Bot + Web bitta containerda (start_all.sh) — shared SQLite: /app/Data_Model.db
 
 [build]
 builder = "nixpacks"
 
 [deploy]
-startCommand = "bash start_web.sh"
+startCommand = "bash start_all.sh"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5

@@ -15,7 +15,11 @@ import supplier_analytics
 
 async def scheduled_update_job():
     print("⏰ Avto-yangilash boshlandi...")
-    await asyncio.to_thread(data_engine.run_full_update)
+    try:
+        await asyncio.to_thread(data_engine.run_full_update)
+        print("✅ Avto-yangilash tugadi.")
+    except Exception as e:
+        print(f"❌ Avto-yangilashda xatolik: {e}")
 
 async def cleanup_caches():
     OBR_CACHE.cleanup()
@@ -53,6 +57,9 @@ async def main():
     scheduler.add_job(cleanup_caches, 'interval', minutes=10)
     scheduler.add_job(send_reminders, 'cron', hour=10, minute=0)
     scheduler.start()
+
+    # Ishga tushganda darhol birinchi sync (DB bo'sh bo'lmasligi uchun)
+    asyncio.create_task(scheduled_update_job())
 
     print("🤖 Bot yangi modulli arxitektura bilan ishga tushdi...")
     

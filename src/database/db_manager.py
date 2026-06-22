@@ -1207,7 +1207,7 @@ def get_supplier_daily_chart(supplier_name: str) -> dict:
     """Supplier uchun kunlik sotuv va qoldiq (oxirgi 30 kun)."""
     try:
         now = datetime.now(TASHKENT_TZ).replace(tzinfo=None)
-        oy_boshi = (now - __import__('datetime').timedelta(days=30)).strftime('%Y-%m-%d')
+        oy_boshi = (now - timedelta(days=30)).strftime('%Y-%m-%d')
 
         sotuv = pd.read_sql(text('''
             SELECT date(s."Дата") as kun,
@@ -1233,4 +1233,3 @@ def get_supplier_daily_chart(supplier_name: str) -> dict:
     except Exception as e:
         print(f"get_supplier_daily_chart xatolik: {e}")
         return {}
-        return {}, {}, "", ""
