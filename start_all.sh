@@ -7,6 +7,7 @@ APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Har ikkalasi ham bir xil mutlaq yo'ldan foydalansin
 export DATABASE_URL="sqlite:////${APP_DIR}/Data_Model.db"
 export PANEL_DB_URL="sqlite:////${APP_DIR}/panel_data.db"
+export PYTHONUNBUFFERED=1
 echo ">>> DATABASE_URL=${DATABASE_URL}"
 
 cd "${APP_DIR}/panel"
@@ -43,7 +44,7 @@ echo ">>> Gunicorn PORT=${PORT:-8000}..."
 cd "${APP_DIR}/panel"
 exec gunicorn panel_config.wsgi:application \
     --bind "0.0.0.0:${PORT:-8000}" \
-    --workers 1 \
+    --workers 2 \
     --timeout 120 \
     --access-logfile - \
     --error-logfile -
