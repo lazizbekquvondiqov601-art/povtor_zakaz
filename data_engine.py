@@ -399,7 +399,7 @@ def update_sales(access_token, engine):
                 try:
                     params = {
                         "start_date": day_str, "end_date": day_str, "page": page,
-                        "limit": 1000, "shop_ids": config.ALL_SHOPS_IDS,
+                        "limit": 900, "shop_ids": config.ALL_SHOPS_IDS,
                         "currency": "UZS", "detalization_by_position": "true"
                     }
                     response = requests.get(
@@ -423,7 +423,7 @@ def update_sales(access_token, engine):
                 break
 
             day_chunks.append(process_and_clean_sales_chunk(records))
-            if len(records) < 1000:
+            if len(records) < 900:
                 break
             page += 1
 
@@ -482,7 +482,7 @@ def update_stock(access_token, engine):
             success = False
             for attempt in range(5):
                 try:
-                    params = {"report_date": day_str, "page": page, "limit": 1000, "shop_ids": config.ALL_SHOPS_IDS, "currency": "UZS"}
+                    params = {"report_date": day_str, "page": page, "limit": 900, "shop_ids": config.ALL_SHOPS_IDS, "currency": "UZS"}
                     response = requests.get(
                         "https://api-admin.billz.ai/v1/stock-report-table",
                         headers={"Authorization": f"Bearer {access_token}"}, params=params, timeout=60
@@ -503,7 +503,7 @@ def update_stock(access_token, engine):
                 break
             
             day_chunks.append(process_and_clean_stock_chunk(records, day_str))
-            if len(records) < 1000:
+            if len(records) < 900:
                 break
             page += 1
         
@@ -992,7 +992,19 @@ def run_full_update():
         engine = db_manager.engine
 
         update_catalog(access_token, engine)
+
+        new_token = get_billz_access_token()
+        if new_token:
+            access_token = new_token
+            print("🔑 Token yangilandi (sotuv oldidan).")
+
         update_sales(access_token, engine)
+
+        new_token = get_billz_access_token()
+        if new_token:
+            access_token = new_token
+            print("🔑 Token yangilandi (qoldiq oldidan).")
+
         update_stock(access_token, engine)
 
         # ALTER TABLE'lar update_stock'dan KEYIN ishlashi shart, chunki to'liq DROP'dan keyin
