@@ -5,74 +5,93 @@
 
 {% block extra_css %}
 <style>
-/* ══════════════════════════════════════════
-   Import Tahlili — page styles
-   ══════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   Import Tahlili — full redesign
+   ══════════════════════════════════════ */
 
-/* ── Page header ── */
-.it-header {
-    display: flex; align-items: center; gap: 14px;
-    margin-bottom: 22px;
+/* Page header */
+.it-top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; margin-bottom: 22px; flex-wrap: wrap;
 }
-.it-header-icon {
-    width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 20px;
-    background: linear-gradient(135deg, rgba(59,130,246,0.22), rgba(99,102,241,0.22));
-    border: 1px solid rgba(59,130,246,0.28);
-    box-shadow: 0 4px 14px -6px rgba(59,130,246,0.4);
+.it-top-left h1 {
+    font-size: 20px; font-weight: 800; color: var(--text-strong); margin: 0 0 3px;
 }
-.it-header h1   { font-size: 18px; font-weight: 700; color: #f1f5f9; margin: 0; line-height: 1.2; }
-.it-header p    { font-size: 12px; color: #64748b; margin: 3px 0 0; }
+.it-top-left p { font-size: 12.5px; color: var(--text-muted); margin: 0; }
 
-/* ── Stats grid ── */
+/* Search (top right) */
+.it-top-search {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.it-search-wrap {
+    position: relative;
+}
+.it-search-wrap svg.si {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; color: var(--text-muted); pointer-events: none;
+}
+.it-search {
+    width: 240px; padding: 8px 12px 8px 33px;
+    background: var(--surface-sunken); border: 1px solid var(--border-default);
+    border-radius: 10px; color: var(--text-strong); font-size: 13px;
+    outline: none; transition: border-color 140ms ease, box-shadow 140ms ease;
+    font-family: var(--font-sans, sans-serif);
+}
+.it-search:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+.it-search::placeholder { color: var(--text-muted); }
+@media (max-width: 640px) {
+    .it-top { flex-direction: column; }
+    .it-top-search { width: 100%; }
+    .it-search { width: 100%; }
+}
+
+/* ── Stats ── */
 .it-stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-bottom: 18px;
+    gap: 12px; margin-bottom: 20px;
 }
-@media (max-width: 640px) {
-    .it-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
-}
+@media (max-width: 768px) { .it-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
+@media (max-width: 400px) { .it-stats { grid-template-columns: repeat(2, 1fr); gap: 8px; } }
+
 .it-stat {
-    position: relative; overflow: hidden;
-    display: flex; flex-direction: column; padding: 13px 14px 11px;
-    border-radius: 12px;
-    border: 1px solid rgba(148,163,184,0.12);
-    background: rgba(15,23,42,0.55);
-    text-decoration: none; cursor: pointer;
-    transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 16px 16px 14px;
+    display: flex; align-items: center; gap: 14px;
+    text-decoration: none;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 140ms ease, transform 140ms ease;
     touch-action: manipulation;
 }
-.it-stat::before {
-    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-    width: 3px; border-radius: 0 2px 2px 0;
-    background: #475569;
+.it-stat:hover  { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.it-stat:active { transform: scale(0.98); }
+.it-stat.on     { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+.it-stat.on.s-red    { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
+.it-stat.on.s-yellow { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.15); }
+.it-stat.on.s-green  { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.15); }
+
+.it-stat-ico {
+    width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
 }
-.it-stat.s-red::before    { background: #ef4444; }
-.it-stat.s-yellow::before { background: #f59e0b; }
-.it-stat.s-blue::before   { background: #3b82f6; }
-.it-stat:hover            { background: rgba(148,163,184,0.08); transform: translateY(-1px); }
-.it-stat:active           { transform: scale(0.98); }
-.it-stat.on               { border-color: rgba(59,130,246,0.38); background: rgba(59,130,246,0.08); }
-.it-stat.on.s-red         { border-color: rgba(239,68,68,0.38);  background: rgba(239,68,68,0.08); }
-.it-stat.on.s-yellow      { border-color: rgba(245,158,11,0.38); background: rgba(245,158,11,0.08); }
+.it-stat-ico svg { width: 22px; height: 22px; }
+.ico-blue   { background: rgba(59,130,246,0.15); color: #3b82f6; }
+.ico-red    { background: rgba(239,68,68,0.15); color: #ef4444; }
+.ico-yellow { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.ico-green  { background: rgba(34,197,94,0.15); color: #22c55e; }
+
+.it-stat-body {}
 .it-stat-num {
-    font-size: 28px; font-weight: 800; line-height: 1;
+    font-size: 24px; font-weight: 800; color: var(--text-strong); line-height: 1;
     font-variant-numeric: tabular-nums;
     font-family: var(--font-mono, monospace);
-    color: #f1f5f9; margin-bottom: 5px;
 }
-.it-stat.s-red    .it-stat-num { color: #fca5a5; }
-.it-stat.s-yellow .it-stat-num { color: #fcd34d; }
-.it-stat.s-blue   .it-stat-num { color: #93c5fd; }
-.it-stat-lbl {
-    font-size: 10.5px; font-weight: 700; color: #475569;
-    text-transform: uppercase; letter-spacing: 0.08em;
-}
+.it-stat-lbl { font-size: 11.5px; color: var(--text-muted); font-weight: 600; margin-top: 3px; }
 
-/* ── Filter scroll rows ── */
-.it-filters { margin-bottom: 18px; display: flex; flex-direction: column; gap: 8px; }
+/* ── Filters ── */
+.it-filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
 .it-frow {
     display: flex; align-items: center; gap: 7px;
     overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -80,391 +99,416 @@
 }
 .it-frow::-webkit-scrollbar { display: none; }
 .it-flabel {
-    font-size: 10px; font-weight: 700; color: #334155;
+    font-size: 10.5px; font-weight: 700; color: var(--text-muted);
     text-transform: uppercase; letter-spacing: 0.1em;
     white-space: nowrap; flex-shrink: 0;
-    padding-right: 4px;
 }
 .it-chip {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 5px 12px; border-radius: 999px;
-    border: 1px solid rgba(148,163,184,0.16);
-    background: rgba(148,163,184,0.05);
-    color: #94a3b8; font-size: 12px; font-weight: 600;
+    padding: 6px 14px; border-radius: 999px;
+    border: 1.5px solid var(--border-default);
+    background: var(--surface-sunken); color: var(--text-muted);
+    font-size: 12.5px; font-weight: 600;
     white-space: nowrap; flex-shrink: 0;
     text-decoration: none;
-    transition: all 140ms ease; touch-action: manipulation;
+    box-shadow: var(--shadow-sm);
+    transition: all 130ms ease; touch-action: manipulation;
 }
-.it-chip:hover  { background: rgba(148,163,184,0.11); color: #e2e8f0; }
-.it-chip:active { transform: scale(0.95); }
+.it-chip:hover  { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.it-chip:active { transform: scale(0.96); }
 .it-chip.on {
-    background: rgba(59,130,246,0.16);
-    border-color: rgba(59,130,246,0.38); color: #60a5fa;
+    background: var(--accent); border-color: var(--accent);
+    color: #fff; box-shadow: 0 2px 8px rgba(37,99,235,0.3);
 }
 
-/* ── Search ── */
-.it-search-wrap {
-    position: relative; margin-bottom: 12px;
+/* Result bar */
+.it-resultbar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; gap: 10px;
 }
-.it-search-wrap .si {
-    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
-    width: 15px; height: 15px; color: #475569; pointer-events: none;
-}
-.it-search {
-    width: 100%; padding: 9px 38px 9px 36px;
-    background: rgba(15,23,42,0.65);
-    border: 1px solid rgba(148,163,184,0.14);
-    border-radius: 10px;
-    color: #e2e8f0; font-size: 13.5px;
-    font-family: var(--font-sans, sans-serif);
-    outline: none;
-    transition: border-color 140ms ease, background 140ms ease;
-}
-.it-search::placeholder { color: #334155; }
-.it-search:focus {
-    border-color: rgba(59,130,246,0.4);
-    background: rgba(11,18,32,0.9);
-}
-.it-clear-btn {
-    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-    width: 22px; height: 22px; border-radius: 50%;
-    background: rgba(148,163,184,0.12); border: none; cursor: pointer;
-    display: none; align-items: center; justify-content: center; color: #64748b;
-    transition: background 140ms ease;
-}
-.it-clear-btn:hover { background: rgba(148,163,184,0.22); color: #e2e8f0; }
-.it-clear-btn svg { width: 12px; height: 12px; }
 .it-count {
-    font-size: 11.5px; color: #475569; font-weight: 600;
-    letter-spacing: 0.03em; margin-bottom: 12px;
+    font-size: 12.5px; font-weight: 700; color: var(--text-muted);
 }
+.it-view-toggle {
+    display: flex; gap: 4px;
+}
+.it-view-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--border-subtle); background: var(--surface-card);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-muted);
+    transition: all 130ms ease;
+}
+.it-view-btn:hover  { border-color: var(--accent); color: var(--accent); }
+.it-view-btn.on     { background: var(--accent); border-color: var(--accent); color: #fff; }
+.it-view-btn svg    { width: 15px; height: 15px; }
 
-/* ── Article card ── */
+/* ── Product grid ── */
+#artGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+}
+@media (max-width: 900px) { #artGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { #artGrid { grid-template-columns: 1fr; } }
+
+/* list view override */
+#artGrid.list-view {
+    grid-template-columns: 1fr;
+}
+#artGrid.list-view .art-card { display: flex; flex-direction: row; }
+#artGrid.list-view .art-img-wrap { width: 120px; flex-shrink: 0; }
+#artGrid.list-view .art-img { height: 100%; border-radius: 12px 0 0 12px; }
+#artGrid.list-view .art-ph  { height: 100%; border-radius: 12px 0 0 12px; }
+#artGrid.list-view .art-card-body { flex: 1; }
+#artGrid.list-view .art-shops { max-height: none; }
+
+/* ── Product card ── */
 .art-card {
-    background: var(--surface-card, #f8fafc);
-    border: 1px solid var(--border-subtle, #e8ecf4);
-    border-left: 3px solid transparent;
-    border-radius: 12px; margin-bottom: 8px; overflow: hidden;
-    transition: box-shadow 140ms ease;
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
+    display: flex; flex-direction: column;
 }
-.art-card:hover           { box-shadow: 0 3px 16px rgba(0,0,0,0.18); }
-.art-card.status-red      { border-left-color: #ef4444; }
-.art-card.status-yellow   { border-left-color: #f59e0b; }
-.art-card.status-white    { border-left-color: #3b82f6; }
+.art-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: var(--border-default); }
 
-/* card head */
-.art-head {
-    display: flex; align-items: center; gap: 11px;
-    padding: 10px 14px 10px 14px;
-    cursor: pointer; user-select: none;
-    min-height: 52px; touch-action: manipulation;
-    transition: background 110ms ease;
+/* Image area */
+.art-img-wrap {
+    position: relative; width: 100%; padding-top: 65%;
+    overflow: hidden; background: var(--surface-sunken);
 }
-.art-head:hover  { background: rgba(148,163,184,0.04); }
-.art-head:active { background: rgba(148,163,184,0.08); }
-
-/* ── Photo thumbnail ── */
-.art-photo-wrap {
-    width: 48px; height: 48px; flex-shrink: 0; position: relative;
-}
-.art-photo {
-    width: 48px; height: 48px; border-radius: 9px;
+.art-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
     object-fit: cover; display: block;
-    border: 1px solid rgba(148,163,184,0.14);
-    background: rgba(148,163,184,0.08);
+    transition: transform 250ms ease;
 }
-.art-photo-ph {
-    width: 48px; height: 48px; border-radius: 9px;
-    background: rgba(148,163,184,0.08);
-    border: 1px solid rgba(148,163,184,0.12);
+.art-card:hover .art-img { transform: scale(1.04); }
+.art-ph {
+    position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
+    background: var(--surface-sunken); color: var(--text-muted);
 }
-.art-photo-ph svg { width: 20px; height: 20px; color: #334155; }
+.art-ph svg { width: 36px; height: 36px; }
 
-/* card meta area */
-.art-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.art-info-top {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+/* Status badge on image */
+.art-status {
+    position: absolute; top: 10px; left: 10px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
-.art-badge {
-    display: inline-flex; align-items: center; gap: 3px;
+.st-red    { background: rgba(239,68,68,0.88);  color: #fff; }
+.st-yellow { background: rgba(245,158,11,0.88); color: #fff; }
+.st-blue   { background: rgba(37,99,235,0.88);  color: #fff; }
+
+/* Days badge on image */
+.art-days-badge {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    background: rgba(0,0,0,0.5); color: #fff;
     padding: 2px 8px; border-radius: 999px;
-    font-size: 10px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
-    letter-spacing: 0.02em;
-}
-.badge-red    { background: rgba(239,68,68,0.14);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.28); }
-.badge-yellow { background: rgba(245,158,11,0.14); color: #fcd34d; border: 1px solid rgba(245,158,11,0.28); }
-.badge-blue   { background: rgba(59,130,246,0.14); color: #93c5fd; border: 1px solid rgba(59,130,246,0.28); }
-.art-artikul  { font-size: 14px; font-weight: 700; color: #f1f5f9; }
-.art-sub      { font-size: 12px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.art-info-bot {
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    min-width: 0;
-}
-.art-sup  { font-size: 12px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
-.art-days { font-size: 11.5px; color: #64748b; font-weight: 600; white-space: nowrap; }
-.art-price { font-size: 11.5px; color: #64748b; white-space: nowrap; }
-.art-dot  { color: #1e293b; font-size: 10px; }
-.art-qty  {
-    font-size: 11.5px; font-weight: 700; color: #e2e8f0;
-    background: rgba(148,163,184,0.1); border: 1px solid rgba(148,163,184,0.14);
-    padding: 1px 7px; border-radius: 5px; white-space: nowrap;
+    font-size: 10px; font-weight: 700;
+    backdrop-filter: blur(4px);
 }
 
-.chevron-wrap {
-    flex-shrink: 0; width: 26px; height: 26px; border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(148,163,184,0.06); border: 1px solid rgba(148,163,184,0.1);
-    transition: background 140ms ease;
+/* Card body */
+.art-card-body { padding: 12px 14px 14px; flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+.art-head-row {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
 }
-.art-head:hover .chevron-wrap { background: rgba(148,163,184,0.12); }
-.chevron-icon {
-    width: 14px; height: 14px; color: #475569;
-    transition: transform 0.25s ease; display: block;
+.art-artikul { font-size: 14px; font-weight: 800; color: var(--text-strong); line-height: 1.2; }
+.art-sub     { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.art-sup     { font-size: 11.5px; color: var(--text-muted); }
+
+.art-price-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.art-price  { font-size: 14px; font-weight: 700; color: var(--accent); }
+.art-qty-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+    padding: 2px 8px; border-radius: 6px;
+    font-size: 11.5px; font-weight: 700; color: var(--text-body);
 }
 
-/* expand body */
-.art-body {
+/* Shops expand */
+.art-shops-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface-sunken); border: 1px solid var(--border-subtle);
+    border-radius: 8px; padding: 7px 10px;
+    cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-body);
+    transition: background 120ms ease;
+    touch-action: manipulation; user-select: none;
+}
+.art-shops-toggle:hover { background: var(--surface-hover); }
+.art-shops-toggle svg   { width: 14px; height: 14px; transition: transform 0.22s ease; }
+.art-shops-toggle.open svg { transform: rotate(180deg); }
+
+.art-shops {
     max-height: 0; overflow: hidden;
-    transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1);
-    border-top: 0px solid var(--border-subtle, #e8ecf4);
+    transition: max-height 0.28s cubic-bezier(0.4,0,0.2,1);
 }
-.art-body.open { max-height: 3000px; border-top-width: 1px; }
+.art-shops.open { max-height: 600px; }
 
-/* shops */
 .shop-block {
-    padding: 10px 16px 8px 16px;
-    border-bottom: 1px solid rgba(148,163,184,0.06);
+    padding: 8px 4px 4px;
+    border-bottom: 1px solid var(--border-subtle);
 }
 .shop-block:last-child { border-bottom: none; }
-.shop-pill {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; font-weight: 700; color: #64748b;
-    letter-spacing: 0.06em; text-transform: uppercase;
-    padding: 3px 10px; border-radius: 6px;
-    background: rgba(148,163,184,0.07);
-    border: 1px solid rgba(148,163,184,0.10);
-    margin-bottom: 8px;
+.shop-name {
+    font-size: 10.5px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.07em;
+    margin-bottom: 5px;
+    display: flex; align-items: center; gap: 4px;
 }
-.shop-pill svg { width: 12px; height: 12px; }
+.shop-name svg { width: 11px; height: 11px; }
 
-/* color rows */
 .color-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 12px; align-items: center;
-    padding: 5px 6px; border-radius: 6px;
-    font-size: 13px;
-    transition: background 100ms ease;
+    display: grid; grid-template-columns: 1fr auto auto;
+    gap: 8px; align-items: center;
+    padding: 3px 4px; border-radius: 5px; font-size: 12px;
 }
-.color-row:hover              { background: rgba(148,163,184,0.05); }
-.color-row:nth-child(even)    { background: rgba(148,163,184,0.03); }
-.color-row:nth-child(even):hover { background: rgba(148,163,184,0.07); }
-.c-name { color: #cbd5e1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.c-qty  { font-weight: 700; color: #f1f5f9; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
-.c-meta { font-size: 11px; color: #475569; white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
+.color-row:hover { background: var(--surface-sunken); }
+.c-name { color: var(--text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-qty  { font-weight: 700; color: var(--text-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.c-meta { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-@media (max-width: 480px) {
+@media (max-width: 400px) {
     .color-row { grid-template-columns: 1fr auto; }
     .c-meta { display: none; }
-    .art-sup { max-width: 120px; }
 }
+
+/* ── Pagination ── */
+.it-pagination {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; margin-top: 24px; flex-wrap: wrap;
+}
+.pg-btn {
+    width: 36px; height: 36px; border-radius: 9px;
+    border: 1px solid var(--border-subtle); background: var(--surface-card);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 600; color: var(--text-muted);
+    cursor: pointer; text-decoration: none;
+    transition: all 130ms ease;
+}
+.pg-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.pg-btn.on    { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pg-btn svg   { width: 14px; height: 14px; }
+.pg-info      { font-size: 12px; color: var(--text-muted); padding: 0 6px; }
 
 /* ── Empty state ── */
 .it-empty {
+    grid-column: 1 / -1;
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; text-align: center;
-    padding: 60px 24px;
+    padding: 64px 24px; text-align: center; color: var(--text-muted);
 }
 .it-empty-ico {
-    width: 56px; height: 56px; border-radius: 16px; margin-bottom: 16px;
-    background: rgba(148,163,184,0.07); border: 1px solid rgba(148,163,184,0.12);
+    width: 60px; height: 60px; border-radius: 18px; margin-bottom: 16px;
+    background: var(--surface-sunken); border: 1px solid var(--border-subtle);
     display: flex; align-items: center; justify-content: center;
 }
-.it-empty-ico svg { width: 26px; height: 26px; color: #334155; }
-.it-empty h3 { font-size: 15px; font-weight: 700; color: #94a3b8; margin: 0 0 8px; }
-.it-empty p  { font-size: 13px; color: #475569; margin: 0; line-height: 1.6; }
+.it-empty-ico svg { width: 28px; height: 28px; color: var(--text-muted); }
+.it-empty h3 { font-size: 15px; font-weight: 700; color: var(--text-body); margin: 0 0 8px; }
+.it-empty p  { font-size: 13px; margin: 0; line-height: 1.6; }
+.it-empty a  { color: var(--accent); text-decoration: none; font-weight: 600; }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- Page header -->
-<div class="it-header">
-    <div class="it-header-icon">📅</div>
-    <div>
+<!-- Top -->
+<div class="it-top">
+    <div class="it-top-left">
         <h1>Import Tahlili</h1>
         <p>Zakazlar holati — kategoriya va qoida bo'yicha</p>
     </div>
+    {% if artikuls %}
+    <div class="it-top-search">
+        <div class="it-search-wrap">
+            <svg class="si" data-lucide="search"></svg>
+            <input type="text" id="itSearch" class="it-search"
+                   placeholder="Qidirish..." autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+    {% endif %}
 </div>
 
-<!-- Stats grid -->
+<!-- Stats -->
 <div class="it-stats">
     <a href="?group={{ selected_group }}&min_day={{ selected_min }}&max_day={{ selected_max }}"
        class="it-stat {% if not selected_status %}on{% endif %}">
-        <div class="it-stat-num">{{ stats.total }}</div>
-        <div class="it-stat-lbl">Jami</div>
+        <div class="it-stat-ico ico-blue"><svg data-lucide="shopping-bag"></svg></div>
+        <div class="it-stat-body">
+            <div class="it-stat-num">{{ stats.total }}</div>
+            <div class="it-stat-lbl">Barcha zakaz</div>
+        </div>
     </a>
     <a href="?group={{ selected_group }}&min_day={{ selected_min }}&max_day={{ selected_max }}&status=red"
        class="it-stat s-red {% if selected_status == 'red' %}on{% endif %}">
-        <div class="it-stat-num">{{ stats.red }}</div>
-        <div class="it-stat-lbl">Kechikkan</div>
+        <div class="it-stat-ico ico-red"><svg data-lucide="clock-alert"></svg></div>
+        <div class="it-stat-body">
+            <div class="it-stat-num">{{ stats.red }}</div>
+            <div class="it-stat-lbl">Kechikkan</div>
+        </div>
     </a>
     <a href="?group={{ selected_group }}&min_day={{ selected_min }}&max_day={{ selected_max }}&status=yellow"
        class="it-stat s-yellow {% if selected_status == 'yellow' %}on{% endif %}">
-        <div class="it-stat-num">{{ stats.yellow }}</div>
-        <div class="it-stat-lbl">Yo'lda</div>
+        <div class="it-stat-ico ico-yellow"><svg data-lucide="truck"></svg></div>
+        <div class="it-stat-body">
+            <div class="it-stat-num">{{ stats.yellow }}</div>
+            <div class="it-stat-lbl">Yo'lda</div>
+        </div>
     </a>
     <a href="?group={{ selected_group }}&min_day={{ selected_min }}&max_day={{ selected_max }}&status=white"
-       class="it-stat s-blue {% if selected_status == 'white' %}on{% endif %}">
-        <div class="it-stat-num">{{ stats.white }}</div>
-        <div class="it-stat-lbl">Yangi</div>
+       class="it-stat s-green {% if selected_status == 'white' %}on{% endif %}">
+        <div class="it-stat-ico ico-green"><svg data-lucide="sparkles"></svg></div>
+        <div class="it-stat-body">
+            <div class="it-stat-num">{{ stats.white }}</div>
+            <div class="it-stat-lbl">Yangi</div>
+        </div>
     </a>
 </div>
 
 <!-- Filters -->
 <div class="it-filters">
-    <!-- Category -->
     <div class="it-frow">
-        <span class="it-flabel">Kat:</span>
-        <a href="?status={{ selected_status }}"
-           class="it-chip {% if not selected_group and not selected_min %}on{% endif %}">Hammasi</a>
+        <span class="it-flabel">KAT:</span>
+        <a href="?status={{ selected_status }}" class="it-chip {% if not selected_group and not selected_min %}on{% endif %}">Hammasi</a>
         {% for key, label in groups_labels.items %}
-        <a href="?group={{ key }}&status={{ selected_status }}"
-           class="it-chip {% if selected_group == key %}on{% endif %}">{{ label }}</a>
+        <a href="?group={{ key }}&status={{ selected_status }}" class="it-chip {% if selected_group == key %}on{% endif %}">{{ label }}</a>
         {% endfor %}
     </div>
-    <!-- Rules -->
     {% if rules %}
     <div class="it-frow">
-        <span class="it-flabel">Qoida:</span>
+        <span class="it-flabel">QOIDA:</span>
         {% for r in rules %}
-        {% if r.num == 4 %}
-        <a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}"
-           class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">🔥 {{ r.min }}–{{ r.max }} kun</a>
-        {% endif %}
-        {% if r.num == 3 %}
-        <a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}"
-           class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">⚡ {{ r.min }}–{{ r.max }} kun</a>
-        {% endif %}
-        {% if r.num == 2 %}
-        <a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}"
-           class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">⚠️ {{ r.min }}–{{ r.max }} kun</a>
-        {% endif %}
-        {% if r.num == 1 %}
-        <a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}"
-           class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">❄️ {{ r.min }}–{{ r.max }} kun</a>
-        {% endif %}
+        {% if r.num == 4 %}<a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}" class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">🔥 {{ r.min }}–{{ r.max }} kun</a>{% endif %}
+        {% if r.num == 3 %}<a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}" class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">⚡ {{ r.min }}–{{ r.max }} kun</a>{% endif %}
+        {% if r.num == 2 %}<a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}" class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">⚠️ {{ r.min }}–{{ r.max }} kun</a>{% endif %}
+        {% if r.num == 1 %}<a href="?min_day={{ r.min }}&max_day={{ r.max }}&status={{ selected_status }}" class="it-chip {% if selected_min == r.min|stringformat:'s' and selected_max == r.max|stringformat:'s' %}on{% endif %}">❄️ {{ r.min }}–{{ r.max }} kun</a>{% endif %}
         {% endfor %}
     </div>
     {% endif %}
 </div>
 
 {% if artikuls %}
-<!-- Search -->
-<div class="it-search-wrap">
-    <svg class="si" data-lucide="search"></svg>
-    <input type="text" id="itSearch" class="it-search"
-           placeholder="Artikul, podkategoriya yoki supplier..." autocomplete="off" spellcheck="false">
-    <button class="it-clear-btn" id="itClear" title="Tozalash">
-        <svg data-lucide="x"></svg>
-    </button>
+<!-- Result bar -->
+<div class="it-resultbar">
+    <div class="it-count" id="itCount">{{ stats.total }} ta natija</div>
+    <div class="it-view-toggle">
+        <button class="it-view-btn on" id="btnGrid" title="Grid ko'rinish" onclick="setView('grid')">
+            <svg data-lucide="layout-grid"></svg>
+        </button>
+        <button class="it-view-btn" id="btnList" title="Ro'yxat ko'rinish" onclick="setView('list')">
+            <svg data-lucide="list"></svg>
+        </button>
+    </div>
 </div>
-<div class="it-count" id="itCount">{{ stats.total }} ta natija</div>
 
-<!-- Cards -->
-<div id="artList">
+<!-- Cards grid -->
+<div id="artGrid">
 {% for a in artikuls %}
-<div class="art-card status-{{ a.status }}"
+<div class="art-card"
      data-q="{{ a.artikul|lower }} {{ a.subcategory|lower }} {{ a.supplier|lower }}">
 
-    <div class="art-head" onclick="toggleCard(this)">
+    <!-- Image -->
+    <div class="art-img-wrap">
+        {% if a.photo and a.photo|slice:":4" == "http" %}
+        <img class="art-img" src="{{ a.photo }}" alt="{{ a.artikul }}"
+             onerror="this.style.display='none';this.parentNode.querySelector('.art-ph').style.display='flex'">
+        <div class="art-ph" style="display:none"><svg data-lucide="image-off"></svg></div>
+        {% else %}
+        <div class="art-ph"><svg data-lucide="shirt"></svg></div>
+        {% endif %}
 
-        <!-- Photo -->
-        <div class="art-photo-wrap">
-            {% if a.photo and a.photo|slice:":4" == "http" %}
-            <img class="art-photo" src="{{ a.photo }}" alt="{{ a.artikul }}"
-                 onerror="this.style.display='none';this.parentNode.querySelector('.art-photo-ph').style.display='flex'">
-            <div class="art-photo-ph" style="display:none">
-                <svg data-lucide="image-off"></svg>
+        <!-- Status badge -->
+        {% if a.status == 'red' %}
+        <span class="art-status st-red">🔴 Kechikkan</span>
+        {% elif a.status == 'yellow' %}
+        <span class="art-status st-yellow">🟡 Yo'lda</span>
+        {% else %}
+        <span class="art-status st-blue">✨ Yangi</span>
+        {% endif %}
+
+        <!-- Days badge -->
+        {% if a.status != 'white' %}
+        <span class="art-days-badge">{{ a.days }} kun</span>
+        {% endif %}
+    </div>
+
+    <!-- Card body -->
+    <div class="art-card-body">
+
+        <div class="art-head-row">
+            <div>
+                <div class="art-artikul">{{ a.artikul }}</div>
+                <div class="art-sup">({{ a.supplier }})</div>
             </div>
+        </div>
+
+        <div class="art-price-row">
+            {% if a.status == 'white' and a.price_str != '0' %}
+            <span class="art-price">{{ a.price_str }} so'm</span>
             {% else %}
-            <div class="art-photo-ph">
-                <svg data-lucide="shirt"></svg>
-            </div>
+            <span class="art-sub">{{ a.subcategory }}</span>
             {% endif %}
+            <span class="art-qty-badge">
+                <svg data-lucide="package" style="width:12px;height:12px;"></svg>
+                {{ a.total_qty }} {{ a.unit }}
+            </span>
         </div>
 
-        <!-- Info -->
-        <div class="art-info">
-            <div class="art-info-top">
-                {% if a.status == 'red' %}
-                    <span class="art-badge badge-red">🔴 Kechikkan</span>
-                {% elif a.status == 'yellow' %}
-                    <span class="art-badge badge-yellow">🟡 Yo'lda</span>
-                {% else %}
-                    <span class="art-badge badge-blue">📦 Yangi</span>
-                {% endif %}
-                <span class="art-artikul">{{ a.artikul }}</span>
-                <span class="art-sub">{{ a.subcategory }}</span>
-            </div>
-            <div class="art-info-bot">
-                <span class="art-sup">{{ a.supplier }}</span>
-                {% if a.status != 'white' %}
-                <span class="art-dot">·</span>
-                <span class="art-days">{{ a.days }} kun</span>
-                {% endif %}
-                {% if a.status == 'white' and a.price_str != '0' %}
-                <span class="art-dot">·</span>
-                <span class="art-price">{{ a.price_str }} so'm</span>
-                {% endif %}
-                <span class="art-dot">·</span>
-                <span class="art-qty">{{ a.total_qty }} {{ a.unit }}</span>
-            </div>
+        <!-- Shops toggle -->
+        {% if a.shops %}
+        <div class="art-shops-toggle" onclick="toggleShops(this)">
+            <span>{{ a.shops|length }} ta do'kon</span>
+            <svg data-lucide="chevron-down"></svg>
         </div>
-
-        <!-- Chevron -->
-        <div class="chevron-wrap">
-            <svg class="chevron-icon" data-lucide="chevron-down"></svg>
-        </div>
-
-    </div><!-- /art-head -->
-
-    <div class="art-body">
-        {% for sh in a.shops %}
-        <div class="shop-block">
-            <div class="shop-pill">
-                <svg data-lucide="store"></svg>
-                {{ sh.shop }}
-            </div>
-            {% for c in sh.colors %}
-            <div class="color-row">
-                <span class="c-name">{{ c.color }}</span>
-                <span class="c-qty">{{ c.qty }} {{ c.unit }}</span>
-                <span class="c-meta">Q:{{ c.qoldiq }} · S:{{ c.sotuv }}</span>
+        <div class="art-shops">
+            {% for sh in a.shops %}
+            <div class="shop-block">
+                <div class="shop-name">
+                    <svg data-lucide="store"></svg>
+                    {{ sh.shop }}
+                </div>
+                {% for c in sh.colors %}
+                <div class="color-row">
+                    <span class="c-name">{{ c.color }}</span>
+                    <span class="c-qty">{{ c.qty }} {{ c.unit }}</span>
+                    <span class="c-meta">Q:{{ c.qoldiq }} · S:{{ c.sotuv }}</span>
+                </div>
+                {% endfor %}
             </div>
             {% endfor %}
         </div>
-        {% endfor %}
-    </div>
+        {% endif %}
 
-</div><!-- /art-card -->
+    </div>
+</div>
 {% endfor %}
-</div><!-- /artList -->
+</div>
+
+<!-- Pagination placeholder (JS bilan) -->
+<div class="it-pagination" id="itPagination"></div>
 
 {% else %}
+<div id="artGrid">
 <div class="it-empty">
     <div class="it-empty-ico"><svg data-lucide="package-open"></svg></div>
     <h3>Ma'lumot topilmadi</h3>
     <p>
         {% if selected_group or selected_min %}
             Tanlangan filtr bo'yicha aktiv zakazlar yo'q.<br>
-            <a href="?" style="color:#60a5fa;text-decoration:none;">Filtrlarni tozalash</a>
+            <a href="?">Filtrlarni tozalash</a>
         {% else %}
             Hozircha aktiv zakazlar mavjud emas.
         {% endif %}
     </p>
+</div>
 </div>
 {% endif %}
 
@@ -472,40 +516,102 @@
 
 {% block extra_js %}
 <script>
-// Expand / collapse
-function toggleCard(head) {
-    var body = head.nextElementSibling;
-    var icon = head.querySelector('.chevron-icon');
-    var open = body.classList.toggle('open');
-    if (icon) icon.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+// ── View toggle (grid / list) ──
+function setView(mode) {
+    var grid   = document.getElementById('artGrid');
+    var btnG   = document.getElementById('btnGrid');
+    var btnL   = document.getElementById('btnList');
+    if (!grid) return;
+    if (mode === 'list') {
+        grid.classList.add('list-view');
+        btnL.classList.add('on'); btnG.classList.remove('on');
+    } else {
+        grid.classList.remove('list-view');
+        btnG.classList.add('on'); btnL.classList.remove('on');
+    }
 }
 
-// Live search + clear button
-(function () {
-    var input  = document.getElementById('itSearch');
-    var clearB = document.getElementById('itClear');
-    var count  = document.getElementById('itCount');
-    var cards  = document.querySelectorAll('#artList .art-card');
-    if (!input) return;
+// ── Shops expand ──
+function toggleShops(btn) {
+    var shops = btn.nextElementSibling;
+    var open  = shops.classList.toggle('open');
+    btn.classList.toggle('open', open);
+}
 
-    function filter() {
-        var q = input.value.trim().toLowerCase();
-        clearB.style.display = q ? 'flex' : 'none';
-        var n = 0;
-        cards.forEach(function(c) {
-            var show = !q || (c.getAttribute('data-q') || '').indexOf(q) !== -1;
-            c.style.display = show ? '' : 'none';
-            if (show) n++;
-        });
-        if (count) count.textContent = n + ' ta natija';
+// ── Live search + pagination ──
+(function () {
+    var input   = document.getElementById('itSearch');
+    var count   = document.getElementById('itCount');
+    var pgWrap  = document.getElementById('itPagination');
+    var allCards = Array.prototype.slice.call(
+        document.querySelectorAll('#artGrid .art-card')
+    );
+
+    var PAGE_SIZE = 18;
+    var currentPage = 1;
+    var visibleCards = allCards.slice();
+
+    function renderPage() {
+        var start = (currentPage - 1) * PAGE_SIZE;
+        var end   = start + PAGE_SIZE;
+        allCards.forEach(function (c) { c.style.display = 'none'; });
+        visibleCards.slice(start, end).forEach(function (c) { c.style.display = ''; });
+
+        if (count) count.textContent = visibleCards.length + ' ta natija';
+        renderPagination();
     }
 
-    input.addEventListener('input', filter);
-    clearB.addEventListener('click', function() {
-        input.value = '';
-        filter();
-        input.focus();
-    });
+    function renderPagination() {
+        if (!pgWrap) return;
+        var total = Math.ceil(visibleCards.length / PAGE_SIZE);
+        if (total <= 1) { pgWrap.innerHTML = ''; return; }
+
+        var html = '';
+        // Prev
+        html += '<button class="pg-btn" onclick="goPage(' + (currentPage - 1) + ')" '
+              + (currentPage === 1 ? 'disabled style="opacity:.4"' : '') + '>'
+              + '<svg data-lucide="chevron-left"></svg></button>';
+
+        for (var i = 1; i <= total; i++) {
+            if (i === 1 || i === total || Math.abs(i - currentPage) <= 1) {
+                html += '<button class="pg-btn' + (i === currentPage ? ' on' : '')
+                      + '" onclick="goPage(' + i + ')">' + i + '</button>';
+            } else if (Math.abs(i - currentPage) === 2) {
+                html += '<span class="pg-info">…</span>';
+            }
+        }
+
+        // Next
+        html += '<button class="pg-btn" onclick="goPage(' + (currentPage + 1) + ')" '
+              + (currentPage === total ? 'disabled style="opacity:.4"' : '') + '>'
+              + '<svg data-lucide="chevron-right"></svg></button>';
+
+        pgWrap.innerHTML = html;
+        lucide.createIcons({ nodes: [pgWrap] });
+    }
+
+    window.goPage = function (p) {
+        var total = Math.ceil(visibleCards.length / PAGE_SIZE);
+        if (p < 1 || p > total) return;
+        currentPage = p;
+        renderPage();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    if (input) {
+        input.addEventListener('input', function () {
+            var q = input.value.trim().toLowerCase();
+            visibleCards = allCards.filter(function (c) {
+                return !q || (c.getAttribute('data-q') || '').indexOf(q) !== -1;
+            });
+            currentPage = 1;
+            renderPage();
+        });
+    }
+
+    // Initial render
+    if (allCards.length > PAGE_SIZE) renderPage();
+    else { allCards.forEach(function (c) { c.style.display = ''; }); }
 })();
 
 lucide.createIcons();
