@@ -198,9 +198,15 @@ def build_caption(article, group, first, color_type, pending_df=None):
 
     for shop, s_group in group.groupby('shop'):
         caption += f"\n🏪 <b>{shop}:</b>"
-        for _, row in s_group.iterrows():
+        color_agg = (
+            s_group.groupby('color', as_index=False)
+            .agg(quantity      =('quantity',       'sum'),
+                 hozirgi_qoldiq=('hozirgi_qoldiq', 'sum'),
+                 prodano        =('prodano',         'sum'))
+        )
+        for _, row in color_agg.iterrows():
             qoldiq = int(float(row.get('hozirgi_qoldiq', 0) or 0))
             sotuv  = int(float(row.get('prodano', 0) or 0))
-            caption += f"\n  - {row.get('color','-')}: <b>{int(row.get('quantity',0))} {unit}</b> (Q:{qoldiq}) (S:{sotuv})"
+            caption += f"\n  - {row['color']}: <b>{int(row['quantity'])} {unit}</b> (Q:{qoldiq}) (S:{sotuv})"
 
     return caption

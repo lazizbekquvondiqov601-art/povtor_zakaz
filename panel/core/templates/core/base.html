@@ -368,8 +368,146 @@
         .zp-burger svg { width: 20px; height: 20px; }
 
         /* ── Sidebar backdrop ── */
-        .zp-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 499; opacity: 0; transition: opacity 0.25s ease; }
+        .zp-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1050; opacity: 0; transition: opacity 0.25s ease; }
         .zp-backdrop.open { opacity: 1; }
+
+        /* ── Mobile nav toggle button (only mobile) ── */
+        .zp-nav-toggle {
+            display: none;
+            align-items: center; justify-content: center;
+            width: 36px; height: 36px;
+            background: rgba(148,163,184,0.05);
+            border: 1px solid rgba(148,163,184,0.10);
+            border-radius: 10px;
+            color: #e2e8f0;
+            cursor: pointer;
+            flex-shrink: 0;
+            padding: 0;
+            transition: background 180ms ease, border-color 180ms ease;
+        }
+        .zp-nav-toggle:hover { background: rgba(148,163,184,0.12); border-color: rgba(148,163,184,0.20); }
+        .zp-nav-toggle svg { width: 20px; height: 20px; }
+
+        /* ── Right-side sliding drawer ── */
+        .zp-drawer {
+            display: none;
+            position: fixed;
+            top: 0; right: 0; bottom: 0;
+            width: min(290px, 88vw);
+            z-index: 1060;
+            background:
+                radial-gradient(120% 60% at 100% 0%, rgba(59,130,246,0.08) 0%, transparent 55%),
+                linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+            border-left: 1px solid rgba(148,163,184,0.08);
+            box-shadow: -8px 0 40px rgba(0,0,0,0.6);
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .zp-drawer.open { transform: translateX(0); }
+
+        .zp-drawer-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 18px 16px 16px;
+            padding-top: calc(18px + var(--tg-safe-area-inset-top, 0px));
+            border-bottom: 1px solid rgba(148,163,184,0.08);
+            background: linear-gradient(180deg, rgba(59,130,246,0.05), transparent);
+            flex-shrink: 0;
+        }
+        .zp-drawer-brand {
+            display: flex; align-items: center; gap: 10px;
+            color: #f1f5f9; font-weight: 700; font-size: 14px;
+            text-decoration: none;
+        }
+        .zp-drawer-brand-mark {
+            width: 34px; height: 34px; border-radius: 9px;
+            display: grid; place-items: center;
+            color: #fff; font-weight: 800; font-size: 14px;
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 60%, #8b5cf6 100%);
+            box-shadow: 0 4px 14px -6px rgba(59,130,246,0.55);
+            flex-shrink: 0;
+        }
+        .zp-drawer-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+        .zp-drawer-brand-title { color: #f1f5f9; font-size: 13.5px; font-weight: 700; }
+        .zp-drawer-brand-sub { color: #64748b; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 2px; }
+        .zp-drawer-close {
+            width: 34px; height: 34px; border-radius: 9px;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: rgba(148,163,184,0.06); border: 1px solid rgba(148,163,184,0.10);
+            color: #64748b; cursor: pointer; padding: 0;
+            transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+            flex-shrink: 0;
+        }
+        .zp-drawer-close:hover { background: rgba(239,68,68,0.12); color: #f87171; border-color: rgba(239,68,68,0.25); }
+        .zp-drawer-close svg { width: 16px; height: 16px; }
+
+        .zp-drawer .zp-drawer-nav {
+            flex: 1 1 auto; min-height: 0;
+            overflow-y: auto; overflow-x: hidden;
+            padding: 10px 12px 8px;
+            display: flex; flex-direction: column; gap: 2px;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148,163,184,0.18) transparent;
+        }
+        .zp-drawer .zp-drawer-nav::-webkit-scrollbar { width: 5px; }
+        .zp-drawer .zp-drawer-nav::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.18); border-radius: 3px; }
+        .zp-drawer .drawer-section {
+            padding: 14px 14px 6px;
+            font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+            text-transform: uppercase; color: #64748b; user-select: none;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .zp-drawer .drawer-section::after {
+            content: ""; flex: 1; height: 1px;
+            background: linear-gradient(90deg, rgba(148,163,184,0.12), transparent);
+        }
+        .zp-drawer .drawer-link {
+            position: relative;
+            display: flex; align-items: center; gap: 13px;
+            padding: 11px 14px; margin: 1px 0;
+            color: #94a3b8; font-size: 14px; font-weight: 500;
+            border-radius: 10px; text-decoration: none;
+            overflow: hidden;
+            transition: background 180ms ease, color 180ms ease;
+        }
+        .zp-drawer .drawer-link svg {
+            width: 18px; height: 18px; flex-shrink: 0; opacity: 0.75;
+            transition: opacity 180ms ease, color 180ms ease;
+        }
+        .zp-drawer .drawer-link:hover { background: rgba(148,163,184,0.07); color: #e2e8f0; }
+        .zp-drawer .drawer-link:hover svg { opacity: 1; }
+        .zp-drawer .drawer-link.active {
+            background: linear-gradient(90deg, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0.05) 60%, transparent 100%);
+            color: #ffffff; font-weight: 700;
+            box-shadow: inset 0 0 0 1px rgba(59,130,246,0.22), 0 4px 14px -6px rgba(59,130,246,0.45);
+        }
+        .zp-drawer .drawer-link.active::before {
+            content: "";
+            position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            width: 3px; height: 20px; border-radius: 0 3px 3px 0;
+            background: linear-gradient(180deg, #60a5fa, #3b82f6);
+            box-shadow: 0 0 10px rgba(59,130,246,0.55);
+        }
+        .zp-drawer .drawer-link.active svg { opacity: 1; color: #60a5fa; }
+        .zp-drawer-footer {
+            flex-shrink: 0;
+            padding: 10px 12px calc(14px + var(--tg-safe-area-inset-bottom, 0px));
+            border-top: 1px solid rgba(148,163,184,0.08);
+            background: linear-gradient(180deg, transparent, rgba(0,0,0,0.25));
+        }
+        .zp-drawer-footer form { margin: 0; }
+        .zp-drawer-footer button.drawer-link {
+            appearance: none; -webkit-appearance: none;
+            background: transparent; border: 0; width: 100%; text-align: left;
+            color: #94a3b8; text-decoration: none; box-shadow: none;
+            cursor: pointer; font: inherit; font-size: 14px; font-weight: 500;
+            padding: 11px 14px; border-radius: 10px;
+            transition: background 180ms ease, color 180ms ease;
+        }
+        .zp-drawer-footer button.drawer-link:hover { background: rgba(239,68,68,0.10); color: #fca5a5; }
+        .zp-drawer-footer button.drawer-link svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.75; }
+        .zp-drawer-footer button.drawer-link:hover svg { color: #f87171; opacity: 1; }
 
         /* ── Utility classes ── */
         .ds-card-header {
@@ -410,55 +548,21 @@
             .zp-topbar .topbar-center { display: none; }
             .zp-topbar .topbar-actions .icon-btn { display: none; }
 
-            /* Sidebar va burger mobileda yashirin — bottom nav ishlatiladi */
+            /* Sidebar yashirin */
             .zp-sidebar { display: none !important; }
             .zp-burger { display: none !important; }
 
-            /* Main: pastki bottom nav uchun joy qoldirish */
-            .zp-main { padding: 12px 12px calc(12px + 60px + var(--tg-safe-area-inset-bottom, 0px)); }
+            /* Bottom nav o'rniga o'ng drawer ishlatiladi */
+            .zp-bottom-nav { display: none !important; }
 
-            /* Bottom navigation bar */
-            .zp-bottom-nav {
-                display: flex;
-                position: fixed;
-                bottom: 0; left: 0; right: 0;
-                z-index: 900;
-                height: calc(60px + var(--tg-safe-area-inset-bottom, 0px));
-                padding-bottom: var(--tg-safe-area-inset-bottom, 0px);
-                background: linear-gradient(0deg, #0b1220 0%, #0f172a 100%);
-                border-top: 1px solid rgba(148,163,184,0.10);
-                box-shadow: 0 -8px 32px rgba(0,0,0,0.45);
-                align-items: stretch;
-            }
-            .zp-bottom-nav .bn-item {
-                flex: 1; min-width: 0;
-                display: flex; flex-direction: column;
-                align-items: center; justify-content: center;
-                gap: 3px;
-                color: #64748b;
-                text-decoration: none;
-                font-size: 9px; font-weight: 600;
-                letter-spacing: 0.05em; text-transform: uppercase;
-                padding: 8px 2px 6px;
-                transition: color 150ms ease;
-                position: relative;
-            }
-            .zp-bottom-nav .bn-item svg {
-                width: 20px; height: 20px; flex-shrink: 0;
-                transition: transform 150ms ease;
-            }
-            .zp-bottom-nav .bn-item:active { opacity: 0.7; }
-            .zp-bottom-nav .bn-item.active { color: #60a5fa; }
-            .zp-bottom-nav .bn-item.active svg { transform: scale(1.1); }
-            .zp-bottom-nav .bn-item.active::before {
-                content: "";
-                position: absolute; top: 0; left: 50%;
-                transform: translateX(-50%);
-                width: 28px; height: 2px;
-                border-radius: 0 0 3px 3px;
-                background: linear-gradient(90deg, #3b82f6, #60a5fa);
-                box-shadow: 0 0 8px rgba(59,130,246,0.5);
-            }
+            /* Nav toggle ko'rinadi */
+            .zp-nav-toggle { display: inline-flex !important; }
+
+            /* Drawer mobileda faollashadi */
+            .zp-drawer { display: flex; }
+
+            /* Main: drawer uchun extra padding yo'q */
+            .zp-main { padding: 14px 12px 20px; }
         }
     </style>
 
@@ -500,6 +604,9 @@
 
     {% if user.is_authenticated %}
         <div class="topbar-actions">
+            <button type="button" class="zp-nav-toggle" id="zpNavToggle" aria-label="Menyu">
+                <svg data-lucide="menu"></svg>
+            </button>
             <button type="button" class="icon-btn sync-btn" id="syncBtn" aria-label="Billz Sync" title="Billz dan ma'lumot yuklash">
                 <svg data-lucide="database"></svg>
             </button>
@@ -523,6 +630,70 @@
 
 <!-- Sidebar backdrop (mobile overlay foni) -->
 <div class="zp-backdrop" id="zpBackdrop"></div>
+
+<!-- O'ng tomondagi sliding drawer (faqat mobile) -->
+<nav class="zp-drawer" id="zpDrawer" aria-label="Navigatsiya">
+
+    <!-- Drawer header -->
+    <div class="zp-drawer-header">
+        <a href="/" class="zp-drawer-brand">
+            <span class="zp-drawer-brand-mark">ZP</span>
+            <span class="zp-drawer-brand-text">
+                <span class="zp-drawer-brand-title">Zakaz Panel</span>
+                <span class="zp-drawer-brand-sub">B2B Inventory</span>
+            </span>
+        </a>
+        <button type="button" class="zp-drawer-close" id="zpDrawerClose" aria-label="Yopish">
+            <svg data-lucide="x"></svg>
+        </button>
+    </div>
+
+    <!-- Nav links -->
+    <div class="zp-drawer-nav">
+        <span class="drawer-section">Asosiy</span>
+
+        <a class="drawer-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="/">
+            <svg data-lucide="layout-dashboard"></svg> Dashboard
+        </a>
+        <a class="drawer-link {% if 'obr' in request.path %}active{% endif %}" href="/obr/">
+            <svg data-lucide="package"></svg> Asosiy Zakaz
+        </a>
+
+        <span class="drawer-section">Tahlil</span>
+
+        <a class="drawer-link {% if 'supplier' in request.path %}active{% endif %}" href="/supplier/">
+            <svg data-lucide="users"></svg> Supplier
+        </a>
+        <a class="drawer-link {% if 'analytics' in request.path %}active{% endif %}" href="/analytics/">
+            <svg data-lucide="bar-chart-2"></svg> Statistika
+        </a>
+        <a class="drawer-link {% if 'stock' in request.path %}active{% endif %}" href="/stock/">
+            <svg data-lucide="archive"></svg> Qoldiqlar
+        </a>
+        <a class="drawer-link {% if 'olik' in request.path %}active{% endif %}" href="/olik/">
+            <svg data-lucide="archive-x"></svg> O'lik Tovarlar
+        </a>
+
+        <span class="drawer-section">Tizim</span>
+
+        <a class="drawer-link {% if 'settings' in request.path %}active{% endif %}" href="/settings/">
+            <svg data-lucide="settings"></svg> Sozlamalar
+        </a>
+    </div>
+
+    <!-- Drawer footer -->
+    <div class="zp-drawer-footer">
+        {% if user.is_authenticated %}
+        <form action="{% url 'logout' %}" method="post" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="drawer-link">
+                <svg data-lucide="log-out"></svg> Chiqish
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+</nav>
 
 <!-- Shell: sidebar + main -->
 <div class="zp-shell">
@@ -657,33 +828,40 @@ lucide.createIcons();
 })();
 </script>
 
-<!-- Mobile sidebar toggle -->
+<!-- Mobile right drawer toggle -->
 <script>
 (function () {
-    var burger   = document.getElementById('zpBurger');
-    var sidebar  = document.getElementById('zpSidebar');
+    var toggle   = document.getElementById('zpNavToggle');
+    var drawer   = document.getElementById('zpDrawer');
+    var closeBtn = document.getElementById('zpDrawerClose');
     var backdrop = document.getElementById('zpBackdrop');
-    if (!burger || !sidebar || !backdrop) return;
+    if (!toggle || !drawer || !backdrop) return;
 
-    function openMenu() {
-        sidebar.classList.add('open');
+    function openDrawer() {
+        drawer.classList.add('open');
         backdrop.style.display = 'block';
-        // reflow → smooth fade-in
         requestAnimationFrame(function () { backdrop.classList.add('open'); });
+        document.body.style.overflow = 'hidden';
+        lucide.createIcons({ nodes: [drawer] });
     }
-    function closeMenu() {
-        sidebar.classList.remove('open');
+    function closeDrawer() {
+        drawer.classList.remove('open');
         backdrop.classList.remove('open');
-        setTimeout(function () { backdrop.style.display = 'none'; }, 250);
+        document.body.style.overflow = '';
+        setTimeout(function () { backdrop.style.display = 'none'; }, 280);
     }
 
-    burger.addEventListener('click', function () {
-        if (sidebar.classList.contains('open')) closeMenu(); else openMenu();
+    toggle.addEventListener('click', function () {
+        if (drawer.classList.contains('open')) closeDrawer(); else openDrawer();
     });
-    backdrop.addEventListener('click', closeMenu);
-    // Sidebar ichidagi havola bosilganda yopilsin
-    sidebar.querySelectorAll('a').forEach(function (a) {
-        a.addEventListener('click', closeMenu);
+    closeBtn && closeBtn.addEventListener('click', closeDrawer);
+    backdrop.addEventListener('click', closeDrawer);
+    drawer.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', closeDrawer);
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer();
     });
 })();
 </script>
