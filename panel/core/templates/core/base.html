@@ -594,6 +594,8 @@
                 <svg data-lucide="archive"></svg><span style="color:#64748b">Ombor</span><span class="crumb-sep">/</span><strong>Qoldiqlar</strong>
             {% elif '/olik' in request.path %}
                 <svg data-lucide="archive-x"></svg><span style="color:#64748b">Ombor</span><span class="crumb-sep">/</span><strong>O'lik Tovarlar</strong>
+            {% elif '/import' in request.path %}
+                <svg data-lucide="calendar"></svg><span style="color:#64748b">Zakazlar</span><span class="crumb-sep">/</span><strong>Import Tahlili</strong>
             {% elif '/settings' in request.path %}
                 <svg data-lucide="settings"></svg><strong>Sozlamalar</strong>
             {% else %}
@@ -670,6 +672,9 @@
         <a class="drawer-link {% if 'stock' in request.path %}active{% endif %}" href="/stock/">
             <svg data-lucide="archive"></svg> Qoldiqlar
         </a>
+        <a class="drawer-link {% if 'import' in request.path %}active{% endif %}" href="/import/">
+            <svg data-lucide="calendar"></svg> Import Tahlili
+        </a>
         <a class="drawer-link {% if 'olik' in request.path %}active{% endif %}" href="/olik/">
             <svg data-lucide="archive-x"></svg> O'lik Tovarlar
         </a>
@@ -731,6 +736,9 @@
             </a>
             <a class="nav-link {% if 'stock' in request.path %}active{% endif %}" href="/stock/">
                 <svg data-lucide="archive"></svg> Qoldiqlar
+            </a>
+            <a class="nav-link {% if 'import' in request.path %}active{% endif %}" href="/import/">
+                <svg data-lucide="calendar"></svg> Import Tahlili
             </a>
             <a class="nav-link {% if 'olik' in request.path %}active{% endif %}" href="/olik/">
                 <svg data-lucide="archive-x"></svg> O'lik Tovarlar

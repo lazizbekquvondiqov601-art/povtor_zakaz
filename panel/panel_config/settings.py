@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'analytics',
     'stock',
     'panel_settings',
+    'import_tahlil',
 ]
 
 # --- Middleware lar ---

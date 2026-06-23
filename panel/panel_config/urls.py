@@ -31,4 +31,5 @@ urlpatterns = [
     path('analytics/', include('analytics.urls')),
     path('stock/', include('stock.urls')),
     path('settings/', include('panel_settings.urls')),
+    path('import/', include('import_tahlil.urls')),
 ]
