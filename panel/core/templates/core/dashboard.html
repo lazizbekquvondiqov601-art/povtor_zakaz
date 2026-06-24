@@ -31,19 +31,27 @@
     gap: var(--space-4);
     margin-bottom: var(--space-6);
 }
+/* KPI kartalar — sparkline version */
 .kpi-card {
     background: var(--surface-card);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
+    box-shadow: 0 1px 3px rgba(21,27,39,0.06), 0 1px 2px rgba(21,27,39,0.04);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+.kpi-card:hover {
+    box-shadow: 0 4px 16px rgba(21,27,39,0.09);
+    transform: translateY(-1px);
+}
+.kpi-card-inner {
     padding: var(--space-5);
-    box-shadow: var(--shadow-sm);
     display: flex;
     align-items: flex-start;
     gap: var(--space-4);
-    transition: box-shadow 0.15s ease;
-}
-.kpi-card:hover {
-    box-shadow: var(--shadow-md);
+    flex: 1;
 }
 .kpi-icon {
     width: 46px;
@@ -73,6 +81,7 @@
     color: var(--text-strong);
     font-family: var(--font-mono);
     line-height: 1.15;
+    letter-spacing: -0.02em;
 }
 .kpi-footer {
     display: flex;
@@ -80,9 +89,12 @@
     gap: var(--space-2);
     margin-top: 5px;
 }
-.kpi-unit {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
+.kpi-unit { font-size: var(--text-xs); color: var(--text-muted); }
+.kpi-sparkline {
+    display: block;
+    width: 100%;
+    height: 36px;
+    margin-top: auto;
 }
 /* Trend badge (o'sish/pasayish ko'rsatkichi) */
 .trend-badge {
@@ -324,108 +336,133 @@
 
     <!-- 1. Bugungi sotuv + trend -->
     <div class="kpi-card">
-        <div class="kpi-icon" style="background:#eff6ff; color:#2563eb;">
-            <svg data-lucide="banknote"></svg>
-        </div>
-        <div class="kpi-body">
-            <div class="kpi-label">Bugungi sotuv</div>
-            <div class="kpi-value">{{ kpi.today_sum_fmt }}</div>
-            <div class="kpi-footer">
-                <span class="kpi-unit">so'm</span>
-                <!-- Trend foizi: ijobiy bo'lsa yashil, salbiy bo'lsa qizil -->
-                {% if kpi.trend_pct > 0 %}
-                    <span class="trend-badge trend-up">
-                        <svg data-lucide="trending-up" style="width:11px;height:11px;"></svg>
-                        +{{ kpi.trend_pct }}%
-                    </span>
-                {% elif kpi.trend_pct < 0 %}
-                    <span class="trend-badge trend-down">
-                        <svg data-lucide="trending-down" style="width:11px;height:11px;"></svg>
-                        {{ kpi.trend_pct }}%
-                    </span>
-                {% else %}
-                    <span class="trend-badge trend-zero">— 0%</span>
-                {% endif %}
+        <div class="kpi-card-inner">
+            <div class="kpi-icon" style="background:#eff6ff; color:#2563eb;">
+                <svg data-lucide="banknote"></svg>
+            </div>
+            <div class="kpi-body">
+                <div class="kpi-label">Bugungi sotuv</div>
+                <div class="kpi-value">{{ kpi.today_sum_fmt }}</div>
+                <div class="kpi-footer">
+                    <span class="kpi-unit">so'm</span>
+                    <!-- Trend foizi: ijobiy bo'lsa yashil, salbiy bo'lsa qizil -->
+                    {% if kpi.trend_pct > 0 %}
+                        <span class="trend-badge trend-up">
+                            <svg data-lucide="trending-up" style="width:11px;height:11px;"></svg>
+                            +{{ kpi.trend_pct }}%
+                        </span>
+                    {% elif kpi.trend_pct < 0 %}
+                        <span class="trend-badge trend-down">
+                            <svg data-lucide="trending-down" style="width:11px;height:11px;"></svg>
+                            {{ kpi.trend_pct }}%
+                        </span>
+                    {% else %}
+                        <span class="trend-badge trend-zero">— 0%</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,28 C30,28 40,12 70,14 C100,16 120,8 150,10 C170,11 185,14 200,12" stroke="#2f5fd6" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        </svg>
     </div>
 
     <!-- 2. Shoshilinch zakazlar -->
     <div class="kpi-card">
-        <div class="kpi-icon" style="background:#fff1f2; color:#e11d48;">
-            <svg data-lucide="alert-triangle"></svg>
-        </div>
-        <div class="kpi-body">
-            <div class="kpi-label">Shoshilinch zakaz</div>
-            <!-- Agar shoshilinch bo'lsa qizil, aks holda odatiy rang -->
-            <div class="kpi-value" {% if kpi.urgent_count > 0 %}style="color:#dc2626;"{% endif %}>
-                {{ kpi.urgent_count }}
+        <div class="kpi-card-inner">
+            <div class="kpi-icon" style="background:#fff1f2; color:#e11d48;">
+                <svg data-lucide="alert-triangle"></svg>
             </div>
-            <div class="kpi-footer">
-                <span class="kpi-unit">ta mahsulot</span>
-                {% if kpi.urgent_count > 0 %}
-                    <span class="ds-badge badge-danger">Diqqat!</span>
-                {% endif %}
+            <div class="kpi-body">
+                <div class="kpi-label">Shoshilinch zakaz</div>
+                <!-- Agar shoshilinch bo'lsa qizil, aks holda odatiy rang -->
+                <div class="kpi-value" {% if kpi.urgent_count > 0 %}style="color:#dc2626;"{% endif %}>
+                    {{ kpi.urgent_count }}
+                </div>
+                <div class="kpi-footer">
+                    <span class="kpi-unit">ta mahsulot</span>
+                    {% if kpi.urgent_count > 0 %}
+                        <span class="ds-badge badge-danger">Diqqat!</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,30 C25,30 40,16 65,18 C90,20 110,8 140,10 C165,12 180,18 200,16" stroke="#c93a30" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        </svg>
     </div>
 
     <!-- 3. Kutilmoqda (pending orders) -->
     <div class="kpi-card">
-        <div class="kpi-icon" style="background:#f0fdf4; color:#16a34a;">
-            <svg data-lucide="shopping-cart"></svg>
-        </div>
-        <div class="kpi-body">
-            <div class="kpi-label">Kutilmoqda</div>
-            <div class="kpi-value">{{ kpi.pending_orders }}</div>
-            <div class="kpi-footer">
-                <span class="kpi-unit">ta zakaz</span>
+        <div class="kpi-card-inner">
+            <div class="kpi-icon" style="background:#f0fdf4; color:#16a34a;">
+                <svg data-lucide="shopping-cart"></svg>
+            </div>
+            <div class="kpi-body">
+                <div class="kpi-label">Kutilmoqda</div>
+                <div class="kpi-value">{{ kpi.pending_orders }}</div>
+                <div class="kpi-footer">
+                    <span class="kpi-unit">ta zakaz</span>
+                </div>
             </div>
         </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,24 C20,24 35,14 60,16 C85,18 100,6 130,8 C160,10 180,12 200,10" stroke="#178049" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        </svg>
     </div>
 
     <!-- 4. Muammoli supplierlar -->
     <div class="kpi-card">
-        <div class="kpi-icon" style="background:#fffbeb; color:#d97706;">
-            <svg data-lucide="users"></svg>
-        </div>
-        <div class="kpi-body">
-            <div class="kpi-label">Muammoli sup.</div>
-            <div class="kpi-value" {% if kpi.problem_suppliers > 0 %}style="color:#dc2626;"{% endif %}>
-                {{ kpi.problem_suppliers }}
+        <div class="kpi-card-inner">
+            <div class="kpi-icon" style="background:#fffbeb; color:#d97706;">
+                <svg data-lucide="users"></svg>
             </div>
-            <div class="kpi-footer">
-                <span class="kpi-unit">ta supplier</span>
-                {% if kpi.problem_suppliers > 0 %}
-                    <span class="ds-badge badge-warning">Kechikmoqda</span>
-                {% endif %}
+            <div class="kpi-body">
+                <div class="kpi-label">Muammoli sup.</div>
+                <div class="kpi-value" {% if kpi.problem_suppliers > 0 %}style="color:#dc2626;"{% endif %}>
+                    {{ kpi.problem_suppliers }}
+                </div>
+                <div class="kpi-footer">
+                    <span class="kpi-unit">ta supplier</span>
+                    {% if kpi.problem_suppliers > 0 %}
+                        <span class="ds-badge badge-warning">Kechikmoqda</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,32 C30,32 45,18 70,20 C100,22 115,12 145,14 C168,16 185,20 200,18" stroke="#bd7a08" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        </svg>
     </div>
 
     <!-- 5. Marja MTD -->
     <div class="kpi-card">
-        <div class="kpi-icon" style="
-            {% if marja_mtd.marja_pct >= 25 %}background:#f0fdf4;color:#16a34a;
-            {% elif marja_mtd.marja_pct >= 15 %}background:#fffbeb;color:#d97706;
-            {% else %}background:#fff1f2;color:#e11d48;{% endif %}">
-            <svg data-lucide="percent"></svg>
-        </div>
-        <div class="kpi-body">
-            <div class="kpi-label">Marja (oy boshidan)</div>
-            <div class="kpi-value" style="
-                {% if marja_mtd.marja_pct >= 25 %}color:#15803d;
-                {% elif marja_mtd.marja_pct >= 15 %}color:#b45309;
-                {% else %}color:#b91c1c;{% endif %}">
-                {{ marja_mtd.marja_pct }}%
+        <div class="kpi-card-inner">
+            <div class="kpi-icon" style="
+                {% if marja_mtd.marja_pct >= 25 %}background:#f0fdf4;color:#16a34a;
+                {% elif marja_mtd.marja_pct >= 15 %}background:#fffbeb;color:#d97706;
+                {% else %}background:#fff1f2;color:#e11d48;{% endif %}">
+                <svg data-lucide="percent"></svg>
             </div>
-            <div class="kpi-footer">
-                <span class="kpi-unit">{{ marja_mtd.gross_mln }} foyda</span>
-                <span style="color:var(--text-muted);font-size:10px;">
-                    {{ marja_mtd.day_of_month }}/{{ marja_mtd.days_in_month }} kun
-                </span>
+            <div class="kpi-body">
+                <div class="kpi-label">Marja (oy boshidan)</div>
+                <div class="kpi-value" style="
+                    {% if marja_mtd.marja_pct >= 25 %}color:#15803d;
+                    {% elif marja_mtd.marja_pct >= 15 %}color:#b45309;
+                    {% else %}color:#b91c1c;{% endif %}">
+                    {{ marja_mtd.marja_pct }}%
+                </div>
+                <div class="kpi-footer">
+                    <span class="kpi-unit">{{ marja_mtd.gross_mln }} foyda</span>
+                    <span style="color:var(--text-muted);font-size:10px;">
+                        {{ marja_mtd.day_of_month }}/{{ marja_mtd.days_in_month }} kun
+                    </span>
+                </div>
             </div>
         </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,26 C25,26 40,14 68,16 C95,18 110,8 138,10 C162,12 178,16 200,14" stroke="#178049" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        </svg>
     </div>
 
 </div>

@@ -228,6 +228,22 @@
             content: ""; flex: 1; height: 1px;
             background: linear-gradient(90deg, rgba(148,163,184,0.12), transparent);
         }
+        /* ── Sidebar section labels ── */
+        .nav-section-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            color: var(--nav-text-dim, #64748b);
+            padding: 18px var(--space-4) 6px;
+            margin: 0;
+            line-height: 1;
+            user-select: none;
+            opacity: 0.65;
+        }
+        .nav-section-label:first-child {
+            padding-top: 10px;
+        }
         /* Nav link */
         .zp-sidebar .nav-link {
             position: relative;
@@ -717,7 +733,7 @@
 
         <!-- Nav links -->
         <div class="zp-nav">
-            <span class="nav-section">Asosiy</span>
+            <div class="nav-section-label">Asosiy</div>
 
             <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="/">
                 <svg data-lucide="layout-dashboard"></svg> Dashboard
@@ -726,7 +742,7 @@
                 <svg data-lucide="package"></svg> Asosiy Zakaz
             </a>
 
-            <span class="nav-section">Tahlil</span>
+            <div class="nav-section-label">Tahlil</div>
 
             <a class="nav-link {% if 'supplier' in request.path %}active{% endif %}" href="/supplier/">
                 <svg data-lucide="users"></svg> Supplier
@@ -737,6 +753,9 @@
             <a class="nav-link {% if 'stock' in request.path %}active{% endif %}" href="/stock/">
                 <svg data-lucide="archive"></svg> Qoldiqlar
             </a>
+
+            <div class="nav-section-label">Zakaz</div>
+
             <a class="nav-link {% if 'import' in request.path %}active{% endif %}" href="/import/">
                 <svg data-lucide="calendar"></svg> Import Tahlili
             </a>
@@ -744,7 +763,7 @@
                 <svg data-lucide="archive-x"></svg> O'lik Tovarlar
             </a>
 
-            <span class="nav-section">Tizim</span>
+            <div class="nav-section-label">Tizim</div>
 
             <a class="nav-link {% if 'settings' in request.path %}active{% endif %}" href="/settings/">
                 <svg data-lucide="settings"></svg> Sozlamalar

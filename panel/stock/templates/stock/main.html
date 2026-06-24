@@ -19,18 +19,19 @@
     flex-wrap:wrap;
     margin-bottom:var(--space-5);
 }
-.ds-label { font-size:var(--text-sm); font-weight:var(--weight-semibold); color:var(--text-body); display:block; margin-bottom:var(--space-1); }
+.ds-label { font-size:var(--text-xs); font-weight:var(--weight-bold); color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:4px; }
 .ds-select {
-    padding:9px 12px;
+    padding:8px 12px;
     font-family:var(--font-sans);
     font-size:var(--text-sm);
     color:var(--text-strong);
     background:var(--surface-sunken);
-    border:1.5px solid var(--border-default);
+    border:1px solid var(--border-default);
     border-radius:var(--radius-md);
     outline:none;
     min-width:160px;
     cursor:pointer;
+    transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 .ds-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
 .ds-btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; font-family:var(--font-sans); font-size:var(--text-sm); font-weight:var(--weight-semibold); border-radius:var(--radius-md); border:none; cursor:pointer; transition:background 0.15s; text-decoration:none; }
@@ -47,19 +48,29 @@
     border:1px solid var(--border-subtle);
     border-radius:var(--radius-lg);
     box-shadow:var(--shadow-sm);
-    padding:var(--space-4) var(--space-5);
+    overflow:hidden;
     display:flex;
-    align-items:center;
+    flex-direction:column;
+    transition: box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+.kpi-box:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.kpi-inner {
+    display:flex;
+    align-items:flex-start;
     gap:var(--space-4);
+    padding:var(--space-4) var(--space-5);
+    flex:1;
 }
 .kpi-icon { width:40px; height:40px; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .kpi-icon svg { width:18px; height:18px; }
 .kpi-icon-accent  { background:var(--accent-soft);  color:var(--accent); }
 .kpi-icon-success { background:var(--success-soft); color:var(--success); }
 .kpi-icon-navy    { background:rgba(26,29,54,.08);  color:var(--navy-800); }
+.kpi-body { display:flex; flex-direction:column; min-width:0; }
 .kpi-label { font-size:var(--text-xs); font-weight:var(--weight-bold); letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); }
 .kpi-value { font-size:var(--text-2xl); font-weight:var(--weight-extrabold); color:var(--text-strong); font-family:var(--font-mono); line-height:1.1; }
 .kpi-unit  { font-size:var(--text-sm); color:var(--text-muted); margin-top:1px; }
+.kpi-sparkline { display:block; width:100%; height:34px; margin-top:auto; }
 
 /* Period badge */
 .period-bar {
@@ -92,19 +103,37 @@
 /* DS Table */
 .ds-table { width:100%; border-collapse:collapse; font-size:var(--text-sm); }
 .ds-table th {
-    padding:9px 14px;
+    padding:10px 14px;
     text-align:left;
     font-size:var(--text-xs);
     font-weight:var(--weight-bold);
     letter-spacing:.04em;
     text-transform:uppercase;
+    color:var(--text-muted);
+    background:var(--surface-sunken);
     border-bottom:1px solid var(--border-subtle);
 }
 .th-accent  { background:var(--accent-soft);  color:var(--accent) !important; }
 .th-success { background:var(--success-soft); color:var(--success-text) !important; }
-.ds-table td { padding:9px 14px; border-bottom:1px solid var(--border-subtle); color:var(--text-body); vertical-align:middle; }
+.ds-table td { padding:10px 14px; border-bottom:1px solid var(--border-subtle); color:var(--text-body); vertical-align:middle; }
+.ds-table tbody tr { transition: background var(--duration-fast) var(--ease-standard); }
 .ds-table tbody tr:last-child td { border-bottom:none; }
-.ds-table tbody tr:hover td { background:var(--surface-sunken); }
+.ds-table tbody tr:hover td { background:var(--accent-soft); }
+.ds-table thead th:first-child { padding-left:var(--space-5); }
+.ds-table thead th:last-child  { padding-right:var(--space-5); }
+.ds-table tbody td:first-child { padding-left:var(--space-5); }
+.ds-table tbody td:last-child  { padding-right:var(--space-5); }
+
+/* Category group rows (if any group spans full width) */
+.ds-table tr.category-row td,
+.ds-table tr.group-header td {
+    background: var(--surface-sunken);
+    font-weight: var(--weight-bold);
+    color: var(--text-strong);
+    text-transform: uppercase;
+    font-size: var(--text-xs);
+    letter-spacing: .04em;
+}
 
 /* Total row */
 .tfoot-row td {
@@ -208,34 +237,49 @@
     <!-- KPI Summary -->
     <div class="kpi-row">
         <div class="kpi-box">
-            <div class="kpi-icon kpi-icon-accent">
-                <svg data-lucide="layers"></svg>
+            <div class="kpi-inner">
+                <div class="kpi-icon kpi-icon-accent">
+                    <svg data-lucide="layers"></svg>
+                </div>
+                <div class="kpi-body">
+                    <div class="kpi-label">Asosiy tovarlar</div>
+                    <div class="kpi-value">{{ total_asosiy }}</div>
+                    <div class="kpi-unit">dona</div>
+                </div>
             </div>
-            <div>
-                <div class="kpi-label">Asosiy tovarlar</div>
-                <div class="kpi-value">{{ total_asosiy }}</div>
-                <div class="kpi-unit">dona</div>
-            </div>
+            <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+                <path d="M0,26 C25,24 45,22 70,20 C100,17 125,14 150,12 C175,11 188,10 200,9" stroke="#2f5fd6" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+            </svg>
         </div>
         <div class="kpi-box">
-            <div class="kpi-icon kpi-icon-success">
-                <svg data-lucide="tag"></svg>
+            <div class="kpi-inner">
+                <div class="kpi-icon kpi-icon-success">
+                    <svg data-lucide="tag"></svg>
+                </div>
+                <div class="kpi-body">
+                    <div class="kpi-label">Aksiya tovarlar</div>
+                    <div class="kpi-value">{{ total_aksiya }}</div>
+                    <div class="kpi-unit">dona</div>
+                </div>
             </div>
-            <div>
-                <div class="kpi-label">Aksiya tovarlar</div>
-                <div class="kpi-value">{{ total_aksiya }}</div>
-                <div class="kpi-unit">dona</div>
-            </div>
+            <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+                <path d="M0,28 C20,26 40,22 60,20 C90,15 115,12 145,10 C170,9 185,8 200,6" stroke="#166534" stroke-width="1.8" stroke-linecap="round" opacity="0.5"/>
+            </svg>
         </div>
         <div class="kpi-box">
-            <div class="kpi-icon kpi-icon-navy">
-                <svg data-lucide="package"></svg>
+            <div class="kpi-inner">
+                <div class="kpi-icon kpi-icon-navy">
+                    <svg data-lucide="package"></svg>
+                </div>
+                <div class="kpi-body">
+                    <div class="kpi-label">Jami qoldiq</div>
+                    <div class="kpi-value">{{ total_all }}</div>
+                    <div class="kpi-unit">dona</div>
+                </div>
             </div>
-            <div>
-                <div class="kpi-label">Jami qoldiq</div>
-                <div class="kpi-value">{{ total_all }}</div>
-                <div class="kpi-unit">dona</div>
-            </div>
+            <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+                <path d="M0,22 C20,24 38,28 60,26 C90,23 110,16 140,18 C165,20 182,26 200,24" stroke="#151b27" stroke-width="1.8" stroke-linecap="round" opacity="0.4"/>
+            </svg>
         </div>
     </div>
 

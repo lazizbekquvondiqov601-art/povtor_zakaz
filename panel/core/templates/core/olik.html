@@ -190,7 +190,7 @@
     font-family: var(--font-mono);
 }
 
-/* ── Summary bar ── */
+/* ── Summary bar (legacy fallback) ── */
 .summary-bar {
     display: flex;
     align-items: center;
@@ -206,6 +206,96 @@
 }
 .summary-bar strong { color: var(--text-strong); }
 .summary-sep { width: 1px; height: 18px; background: var(--border-subtle); }
+
+/* ── KPI cards (top summary) ── */
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+}
+.kpi-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+.kpi-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+.kpi-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    flex: 1;
+}
+.kpi-icon {
+    width: 38px; height: 38px;
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+.kpi-icon svg { width: 18px; height: 18px; }
+.kpi-icon-red    { background: #fee2e2; color: #991b1b; }
+.kpi-icon-amber  { background: #fef3c7; color: #92400e; }
+.kpi-icon-green  { background: #dcfce7; color: #166534; }
+.kpi-icon-blue   { background: var(--accent-soft); color: var(--accent); }
+.kpi-icon-navy   { background: rgba(21,27,39,.08); color: var(--text-strong); }
+.kpi-body { display: flex; flex-direction: column; min-width: 0; }
+.kpi-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+.kpi-value {
+    font-size: var(--text-xl);
+    font-weight: var(--weight-extrabold);
+    color: var(--text-strong);
+    font-family: var(--font-mono);
+    line-height: 1.15;
+    word-break: break-word;
+}
+.kpi-unit {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+.kpi-sparkline {
+    display: block;
+    width: 100%;
+    height: 34px;
+    margin-top: auto;
+}
+
+@media (max-width: 1100px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 720px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Table polish (data-heavy) ── */
+.ds-table tbody tr { transition: background var(--duration-fast) var(--ease-standard); }
+.ds-table tbody tr:hover td { background: var(--accent-soft); }
+.ds-table tbody tr td:first-child { padding-left: var(--space-5); }
+.ds-table tbody tr td:last-child  { padding-right: var(--space-5); }
+.ds-table thead th:first-child { padding-left: var(--space-5); }
+.ds-table thead th:last-child  { padding-right: var(--space-5); }
+.ds-table img {
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+}
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
@@ -421,17 +511,73 @@
 </div>
 </form>
 
-<!-- ── Summary bar ── -->
-<div class="summary-bar">
-    <span><strong>{{ total_count }}</strong> ta tovar</span>
-    <span class="summary-sep"></span>
-    <span>Jami qoldiq: <strong>{{ total_qoldiq }}</strong></span>
-    <span class="summary-sep"></span>
-    <span>Sotuv: <strong>{{ total_s90 }}</strong></span>
-    <span class="summary-sep"></span>
-    <span>Sotuv summa: <strong>{{ total_sotuv_summa }}</strong></span>
-    <span class="summary-sep"></span>
-    <span>Muzlagan kapital: <strong>{{ total_jami }}</strong></span>
+<!-- ── KPI summary cards ── -->
+<div class="kpi-row">
+    <div class="kpi-card">
+        <div class="kpi-inner">
+            <div class="kpi-icon kpi-icon-navy"><svg data-lucide="package-x"></svg></div>
+            <div class="kpi-body">
+                <div class="kpi-label">O'lik tovarlar</div>
+                <div class="kpi-value">{{ total_count }}</div>
+                <div class="kpi-unit">ta nom</div>
+            </div>
+        </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+            <path d="M0,30 C25,30 40,16 70,18 C100,20 115,8 145,10 C168,12 185,16 200,14" stroke="#151b27" stroke-width="1.8" stroke-linecap="round" opacity="0.35"/>
+        </svg>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-inner">
+            <div class="kpi-icon kpi-icon-blue"><svg data-lucide="boxes"></svg></div>
+            <div class="kpi-body">
+                <div class="kpi-label">Jami qoldiq</div>
+                <div class="kpi-value">{{ total_qoldiq }}</div>
+                <div class="kpi-unit">dona</div>
+            </div>
+        </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+            <path d="M0,22 C20,24 38,28 60,26 C90,23 110,16 140,18 C165,20 182,26 200,24" stroke="#2f5fd6" stroke-width="1.8" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-inner">
+            <div class="kpi-icon kpi-icon-green"><svg data-lucide="trending-up"></svg></div>
+            <div class="kpi-body">
+                <div class="kpi-label">Sotuv</div>
+                <div class="kpi-value">{{ total_s90 }}</div>
+                <div class="kpi-unit">dona</div>
+            </div>
+        </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+            <path d="M0,28 C20,26 40,22 60,20 C90,15 115,12 145,10 C170,9 185,8 200,6" stroke="#166534" stroke-width="1.8" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-inner">
+            <div class="kpi-icon kpi-icon-blue"><svg data-lucide="banknote"></svg></div>
+            <div class="kpi-body">
+                <div class="kpi-label">Sotuv summa</div>
+                <div class="kpi-value">{{ total_sotuv_summa }}</div>
+                <div class="kpi-unit">so'm</div>
+            </div>
+        </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+            <path d="M0,26 C25,24 45,22 70,20 C100,17 125,14 150,12 C175,11 188,10 200,9" stroke="#2f5fd6" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-inner">
+            <div class="kpi-icon kpi-icon-red"><svg data-lucide="snowflake"></svg></div>
+            <div class="kpi-body">
+                <div class="kpi-label">Muzlagan kapital</div>
+                <div class="kpi-value">{{ total_jami }}</div>
+                <div class="kpi-unit">so'm</div>
+            </div>
+        </div>
+        <svg class="kpi-sparkline" viewBox="0 0 200 36" fill="none" preserveAspectRatio="none">
+            <path d="M0,30 C25,30 40,16 70,18 C100,20 115,8 145,10 C168,12 185,16 200,14" stroke="#c93a30" stroke-width="1.8" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+    </div>
 </div>
 
 <!-- ── Jadval ── -->
